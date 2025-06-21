@@ -1,0 +1,170 @@
+# Configz - Git Ignore File
+
+# =============================================================================
+# SYSTEM FILES
+# =============================================================================
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# =============================================================================
+# EDITOR FILES
+# =============================================================================
+
+# Vim
+*.swp
+*.swo
+*~
+.viminfo
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Atom
+.atom/
+
+# =============================================================================
+# BACKUP FILES
+# =============================================================================
+
+# Configuration backups (created by our scripts)
+*.backup.*
+*.bak
+*.orig
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# =============================================================================
+# DEVELOPMENT FILES
+# =============================================================================
+
+# Node.js (if we add any)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python (if we add any)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# =============================================================================
+# RUNTIME FILES
+# =============================================================================
+
+# Log files
+*.log
+logs/
+*.log.*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# =============================================================================
+# CUSTOM IGNORES
+# =============================================================================
+
+# Local development files
+.local/
+local/
+private/
+
+# Test files
+test/
+tests/
+*.test
+*.spec
+
+# Documentation builds
+docs/_build/
+site/
+
+# IDE configurations
+.idea/
+*.iml
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# =============================================================================
+# EXCEPTIONS (files to keep)
+# =============================================================================
+
+# Keep important dotfiles
+!.gitignore
+!.gitkeep
+
+# Keep all config files in the config/ directory
+!config/
+!config/**
+
+# Keep all library files
+!lib/
+!lib/**
+
+# Keep all installation scripts
+!install/
+!install/**
