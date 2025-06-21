@@ -216,17 +216,29 @@ create_artifacts() {
         "CLI_GUIDE.md"
         "ALPHA_STATUS.md"
         "RELEASE_NOTES_v$version.md"
-        "cli/"
-        "config/"
-        "completions/"
-        "man/"
         "config.toml.template"
     )
 
+    local release_dirs=(
+        "cli"
+        "config"
+        "completions"
+        "man"
+    )
+
+    # Copy files
     for item in "${release_files[@]}"; do
-        if [[ -e "$item" ]]; then
-            cp -r "$item" "$release_dir/"
+        if [[ -f "$item" ]]; then
+            cp "$item" "$release_dir/"
             log_info "Added to release: $item"
+        fi
+    done
+
+    # Copy directories
+    for item in "${release_dirs[@]}"; do
+        if [[ -d "$item" ]]; then
+            cp -r "$item" "$release_dir/"
+            log_info "Added to release: $item/"
         fi
     done
 
