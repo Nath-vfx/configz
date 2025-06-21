@@ -15,7 +15,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR"
 
 # Configuration paths
-TOOLS_CONFIG="$PROJECT_ROOT/lib/tools.conf"
 CONFIG_SOURCE_DIR="$PROJECT_ROOT/config"
 TARGET_BASE_DIR="$HOME/.config"
 
@@ -99,35 +98,58 @@ backup_directory() {
 # TOOL MANAGEMENT
 # =============================================================================
 
-# Dynamic tool selection state
-declare -A TOOL_SELECTION
-declare -a AVAILABLE_TOOLS
-declare -A TOOL_INFO
+# Dynamic module selection state
+declare -A MODULE_SELECTION
+declare -a AVAILABLE_MODULES
+declare -A MODULE_INFO
 
-# Initialize tool selection
-init_tool_selection() {
-    if [[ ! -f "$TOOLS_CONFIG" ]]; then
-        log_error "Configuration file not found: $TOOLS_CONFIG"
+# Parse TOML configuration for a module
+parse_module_config() {
+    local module_id="$1"
+    local config_file="$CONFIG_SOURCE_DIR/$module_id/configz.toml"
+
+    if [[ ! -f "$config_file" ]]; then
+        log_warning "No configz.toml found for module: $module_id"
+        return 1
+    fi
+
+    # Parse TOML using yq
+    local name=$(yq eval '.module.name' "$config_file" 2>/dev/null || echo "$module_id")
+    local desc=$(yq eval '.module.description' "$config_file" 2>/dev/null || echo "Configuration module")
+    local icon=$(yq eval '.module.icon' "$config_file" 2>/dev/null || echo "📦")
+    local target=$(yq eval '.paths.target' "$config_file" 2>/dev/null || echo "$module_id")
+    local install_type=$(yq eval '.installation.type' "$config_file" 2>/dev/null || echo "copy")
+
+    MODULE_INFO["${module_id}_name"]="$icon $name"
+    MODULE_INFO["${module_id}_desc"]="$desc"
+    MODULE_INFO["${module_id}_target"]="$target"
+    MODULE_INFO["${module_id}_type"]="$install_type"
+    MODULE_INFO["${module_id}_config"]="$config_file"
+}
+
+# Initialize module discovery
+init_module_discovery() {
+    if [[ ! -d "$CONFIG_SOURCE_DIR" ]]; then
+        log_error "Configuration directory not found: $CONFIG_SOURCE_DIR"
         exit 1
     fi
 
-    # Parse tools configuration
-    while IFS='|' read -r tool_id tool_name tool_desc source_path target_path install_func; do
-        # Skip comments and empty lines
-        [[ "$tool_id" =~ ^[[:space:]]*# ]] && continue
-        [[ -z "${tool_id// }" ]] && continue
+    # Auto-discover modules by scanning config directory
+    for module_dir in "$CONFIG_SOURCE_DIR"/*; do
+        if [[ -d "$module_dir" ]]; then
+            local module_id=$(basename "$module_dir")
 
-        AVAILABLE_TOOLS+=("$tool_id")
-        TOOL_SELECTION["$tool_id"]=0
-        TOOL_INFO["${tool_id}_name"]="$tool_name"
-        TOOL_INFO["${tool_id}_desc"]="$tool_desc"
-        TOOL_INFO["${tool_id}_source"]="$source_path"
-        TOOL_INFO["${tool_id}_target"]="$target_path"
-        TOOL_INFO["${tool_id}_func"]="$install_func"
-    done < "$TOOLS_CONFIG"
+            # Skip if no configz.toml exists, but try to parse anyway
+            if parse_module_config "$module_id"; then
+                AVAILABLE_MODULES+=("$module_id")
+                MODULE_SELECTION["$module_id"]=0
+                log_info "Discovered module: $module_id"
+            fi
+        fi
+    done
 
-    if [[ ${#AVAILABLE_TOOLS[@]} -eq 0 ]]; then
-        log_error "No tools found in configuration"
+    if [[ ${#AVAILABLE_MODULES[@]} -eq 0 ]]; then
+        log_error "No modules found in $CONFIG_SOURCE_DIR"
         exit 1
     fi
 }
@@ -153,30 +175,30 @@ show_menu() {
     echo
 
     local index=1
-    for tool_id in "${AVAILABLE_TOOLS[@]}"; do
-        local tool_name="${TOOL_INFO[${tool_id}_name]}"
-        local tool_desc="${TOOL_INFO[${tool_id}_desc]}"
-        local target_path="${TOOL_INFO[${tool_id}_target]}"
+    for module_id in "${AVAILABLE_MODULES[@]}"; do
+        local module_name="${MODULE_INFO[${module_id}_name]}"
+        local module_desc="${MODULE_INFO[${module_id}_desc]}"
+        local target_path="${MODULE_INFO[${module_id}_target]}"
 
         local checkbox_icon status_text
-        if [[ ${TOOL_SELECTION["$tool_id"]} -eq 1 ]]; then
+        if [[ ${MODULE_SELECTION["$module_id"]} -eq 1 ]]; then
             checkbox_icon="${GREEN}☑${NC}"
             status_text="${GREEN}Sélectionné${NC}"
         else
             checkbox_icon="${RED}☐${NC}"
-            status_text="${DIM}Non sélectionné${NC}"
+            status_text="${RED}Non sélectionné${NC}"
         fi
 
         # Check if already installed
         local install_status=""
         if [[ -e "$TARGET_BASE_DIR/$target_path" ]]; then
-            install_status=" ${YELLOW}(Déjà installé)${NC}"
+            install_status=" ${YELLOW}(Installé)${NC}"
         fi
 
-        echo -e "  $checkbox_icon ${YELLOW}$index.${NC} ${BOLD}$tool_name${NC}$install_status"
-        echo -e "     ${DIM}$tool_desc${NC}"
-        echo -e "     ${BLUE}└─${NC} Target: ${DIM}~/$target_path${NC}"
-        echo -e "     ${DIM}Status: $status_text${NC}"
+        echo -e "  $checkbox_icon ${BOLD}$index.${NC} $module_name"
+        echo -e "     ${DIM}$module_desc${NC}"
+        echo -e "     ${BLUE}└─${NC} Target: ${BOLD}~/.config/$target_path${NC}$install_status"
+        echo -e "     Status: $status_text"
         echo
 
         ((index++))
@@ -198,15 +220,15 @@ toggle_selection() {
     local selection="$1"
 
     # Check if it's a valid number
-    if [[ "$selection" =~ ^[0-9]+$ ]] && [ "$selection" -ge 1 ] && [ "$selection" -le "${#AVAILABLE_TOOLS[@]}" ]; then
-        local tool_id="${AVAILABLE_TOOLS[$((selection - 1))]}"
+    if [[ "$selection" =~ ^[0-9]+$ ]] && [ "$selection" -ge 1 ] && [ "$selection" -le "${#AVAILABLE_MODULES[@]}" ]; then
+        local module_id="${AVAILABLE_MODULES[$((selection - 1))]}"
 
-        if [[ ${TOOL_SELECTION["$tool_id"]} -eq 0 ]]; then
-            TOOL_SELECTION["$tool_id"]=1
-            echo -e "${GREEN}✓ ${TOOL_INFO[${tool_id}_name]} sélectionné${NC}"
+        if [[ ${MODULE_SELECTION["$module_id"]} -eq 0 ]]; then
+            MODULE_SELECTION["$module_id"]=1
+            echo -e "${GREEN}✓ ${MODULE_INFO[${module_id}_name]} sélectionné${NC}"
         else
-            TOOL_SELECTION["$tool_id"]=0
-            echo -e "${YELLOW}○ ${TOOL_INFO[${tool_id}_name]} désélectionné${NC}"
+            MODULE_SELECTION["$module_id"]=0
+            echo -e "${YELLOW}○ ${MODULE_INFO[${module_id}_name]} désélectionné${NC}"
         fi
         sleep 1
         return 0
@@ -214,31 +236,31 @@ toggle_selection() {
     return 1
 }
 
-# Select all tools
+# Select all modules
 select_all() {
-    for tool in "${AVAILABLE_TOOLS[@]}"; do
-        TOOL_SELECTION["$tool"]=1
+    for module in "${AVAILABLE_MODULES[@]}"; do
+        MODULE_SELECTION["$module"]=1
     done
-    echo -e "${GREEN}✓ Tous les outils sélectionnés${NC}"
+    echo -e "${GREEN}✓ Tous les modules sélectionnés${NC}"
     sleep 1
 }
 
-# Deselect all tools
+# Deselect all modules
 select_none() {
-    for tool in "${AVAILABLE_TOOLS[@]}"; do
-        TOOL_SELECTION["$tool"]=0
+    for module in "${AVAILABLE_MODULES[@]}"; do
+        MODULE_SELECTION["$module"]=0
     done
-    echo -e "${YELLOW}○ Tous les outils désélectionnés${NC}"
+    echo -e "${YELLOW}○ Tous les modules désélectionnés${NC}"
     sleep 1
 }
 
 # Get selected tools
-get_selected_tools() {
+get_selected_modules() {
     local selected=()
 
-    for tool in "${AVAILABLE_TOOLS[@]}"; do
-        if [[ ${TOOL_SELECTION["$tool"]} -eq 1 ]]; then
-            selected+=("$tool")
+    for module in "${AVAILABLE_MODULES[@]}"; do
+        if [[ ${MODULE_SELECTION["$module"]} -eq 1 ]]; then
+            selected+=("$module")
         fi
     done
 
@@ -255,13 +277,13 @@ show_status() {
     local selected_count=0
     local installed_count=0
 
-    for tool_id in "${AVAILABLE_TOOLS[@]}"; do
-        local tool_name="${TOOL_INFO[${tool_id}_name]}"
-        local target_path="${TOOL_INFO[${tool_id}_target]}"
+    for module_id in "${AVAILABLE_MODULES[@]}"; do
+        local module_name="${MODULE_INFO[${module_id}_name]}"
+        local target_path="${MODULE_INFO[${module_id}_target]}"
 
         local selection_status install_status
 
-        if [[ ${TOOL_SELECTION["$tool_id"]} -eq 1 ]]; then
+        if [[ ${MODULE_SELECTION["$module_id"]} -eq 1 ]]; then
             selection_status="${GREEN}Sélectionné${NC}"
             ((selected_count++))
         else
@@ -270,15 +292,12 @@ show_status() {
 
         if [[ -e "$TARGET_BASE_DIR/$target_path" ]]; then
             install_status="${GREEN}Installé${NC}"
-            ((installed_count++))
         else
-            install_status="${RED}Non installé${NC}"
+            install_status="${DIM}Non installé${NC}"
         fi
 
-        echo -e "${BOLD}$tool_name${NC}"
-        echo -e "  Sélection: $selection_status"
-        echo -e "  Installation: $install_status"
-        echo -e "  Chemin: ${DIM}~/$target_path${NC}"
+        echo -e "  ${BOLD}$module_name${NC} - $selection_status ($install_status)"
+        echo -e "  Target: ${DIM}~/.config/$target_path${NC}"
         echo
     done
 
@@ -343,18 +362,57 @@ install_starship() {
     log_success "Starship Prompt configuré ✓"
 }
 
-# Install a single tool
-install_tool() {
-    local tool_id="$1"
-    local install_func="${TOOL_INFO[${tool_id}_func]}"
+# Generic module installer using TOML configuration
+install_module() {
+    local module_id="$1"
+    local config_file="${MODULE_INFO[${module_id}_config]}"
+    local install_type="${MODULE_INFO[${module_id}_type]}"
+    local target_path="${MODULE_INFO[${module_id}_target]}"
+    local full_target="$TARGET_BASE_DIR/$target_path"
 
-    # Check if install function exists and call it
-    if command -v "$install_func" >/dev/null 2>&1; then
-        "$install_func"
-    else
-        log_error "Fonction d'installation non trouvée: $install_func"
-        return 1
+    log_info "Installation de ${MODULE_INFO[${module_id}_name]}"
+
+    # Create target directory
+    ensure_directory "$full_target"
+
+    # Handle backup based on TOML config
+    local backup_strategy=$(yq eval '.backup.strategy' "$config_file" 2>/dev/null || echo "auto")
+    if [[ "$backup_strategy" != "none" && $NO_BACKUP -eq 0 ]]; then
+        if [[ -d "$full_target" && "$(ls -A "$full_target" 2>/dev/null)" ]]; then
+            backup_directory "$full_target"
+        fi
     fi
+
+    # Get sources from TOML
+    local sources_count=$(yq eval '.paths.sources | length' "$config_file" 2>/dev/null || echo "0")
+    if [[ "$sources_count" -gt 0 ]]; then
+        for ((i=0; i<sources_count; i++)); do
+            local source=$(yq eval ".paths.sources[$i]" "$config_file")
+            local source_path="$CONFIG_SOURCE_DIR/$module_id/$source"
+
+            if [[ -e "$source_path" ]]; then
+                case "$install_type" in
+                    "copy")
+                        cp -r "$source_path" "$full_target/"
+                        ;;
+                    "symlink")
+                        ln -sf "$source_path" "$full_target/"
+                        ;;
+                    *)
+                        log_error "Type d'installation non supporté: $install_type"
+                        return 1
+                        ;;
+                esac
+            else
+                log_warning "Source non trouvée: $source_path"
+            fi
+        done
+    else
+        # Fallback: copy all non-toml files
+        find "$CONFIG_SOURCE_DIR/$module_id" -type f ! -name "configz.toml" -exec cp {} "$full_target/" \;
+    fi
+
+    log_success "${MODULE_INFO[${module_id}_name]} configuré ✓"
 }
 
 # Show installation confirmation
@@ -369,9 +427,9 @@ show_installation_confirmation() {
     echo
 
     for tool_id in "${selected_tools[@]}"; do
-        local tool_name="${TOOL_INFO[${tool_id}_name]}"
-        local tool_desc="${TOOL_INFO[${tool_id}_desc]}"
-        local target_path="${TOOL_INFO[${tool_id}_target]}"
+        local tool_name="${MODULE_INFO[${tool_id}_name]}"
+        local tool_desc="${MODULE_INFO[${tool_id}_desc]}"
+        local target_path="${MODULE_INFO[${tool_id}_target]}"
         local full_target="$TARGET_BASE_DIR/$target_path"
 
         echo -e "  ${GREEN}✓${NC} ${BOLD}$tool_name${NC}"
@@ -406,7 +464,7 @@ show_installation_confirmation() {
 # Run installation process
 run_installation() {
     local selected_tools
-    mapfile -t selected_tools < <(get_selected_tools)
+    mapfile -t selected_tools < <(get_selected_modules)
 
     if [[ ${#selected_tools[@]} -eq 0 ]]; then
         log_warning "Aucune configuration sélectionnée !"
@@ -455,7 +513,7 @@ run_installation() {
     for tool_id in "${selected_tools[@]}"; do
         echo -e "${BOLD}[${tool_id}]${NC} Installation..."
 
-        if install_tool "$tool_id"; then
+        if install_module "$tool_id"; then
             ((success_count++))
         else
             failed_tools+=("$tool_id")
@@ -493,10 +551,10 @@ show_installation_details() {
     echo
 
     for tool_id in "${selected_tools[@]}"; do
-        local tool_name="${TOOL_INFO[${tool_id}_name]}"
-        local source_path="${TOOL_INFO[${tool_id}_source]}"
-        local target_path="${TOOL_INFO[${tool_id}_target]}"
-        local full_source="$PROJECT_ROOT/$source_path"
+        local tool_name="${MODULE_INFO[${tool_id}_name]}"
+        local source_path="$CONFIG_SOURCE_DIR/$tool_id"
+        local target_path="${MODULE_INFO[${tool_id}_target]}"
+        local full_source="$source_path"
         local full_target="$TARGET_BASE_DIR/$target_path"
 
         echo -e "${BOLD}$tool_name${NC}"
@@ -584,10 +642,10 @@ main() {
         log_warning "Mode simulation activé - aucune modification ne sera effectuée"
     fi
 
-    # Initialize tool selection
-    init_tool_selection
+    # Initialize module discovery
+    init_module_discovery
 
-    log_info "Outils disponibles: ${#AVAILABLE_TOOLS[@]} (${AVAILABLE_TOOLS[*]})"
+    log_info "Modules disponibles: ${#AVAILABLE_MODULES[@]} (${AVAILABLE_MODULES[*]})"
 
     while true; do
         show_menu

@@ -1,0 +1,40 @@
+[module]
+name = "Starship Prompt"
+description = "Prompt cross-shell rapide et personnalisable"
+icon = "⭐"
+version = "1.0.0"
+author = "Configz"
+
+[installation]
+# Type d'installation : "copy", "symlink", "custom"
+type = "copy"
+# Fonction d'installation personnalisée (optionnelle)
+# custom_function = "install_starship_custom"
+
+[paths]
+# Chemin relatif dans ~/.config/
+target = "starship"
+# Fichiers/dossiers à copier (relatif au dossier du module)
+sources = ["starship.toml"]
+
+[dependencies]
+# Paquets système requis (optionnel)
+system = ["starship"]
+# Autres modules configz requis (optionnel)
+modules = []
+
+[post_install]
+# Messages à afficher après installation
+notes = [
+    "Assurez-vous que Starship est installé",
+    "Ajoutez dans votre shell: eval \"$(starship init bash)\"",
+    "Pour Fish: starship init fish | source",
+]
+# Commandes à exécuter après installation (optionnel)
+# commands = []
+
+[backup]
+# Stratégie de backup : "auto", "manual", "none"
+strategy = "auto"
+# Fichiers à sauvegarder spécifiquement
+files = ["starship.toml"]
