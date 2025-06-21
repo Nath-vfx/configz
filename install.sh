@@ -103,28 +103,36 @@ declare -A MODULE_SELECTION
 declare -a AVAILABLE_MODULES
 declare -A MODULE_INFO
 
-# Parse TOML configuration for a module
+# Parse TOML configuration for a module (optional)
 parse_module_config() {
     local module_id="$1"
     local config_file="$CONFIG_SOURCE_DIR/$module_id/configz.toml"
 
-    if [[ ! -f "$config_file" ]]; then
-        log_warning "No configz.toml found for module: $module_id"
-        return 1
-    fi
+    # Default configuration based on folder name
+    local name=$(echo "$module_id" | sed 's/_/ /g' | awk '{print toupper(substr($0,1,1)) tolower(substr($0,2))}')  # Capitalize first letter and replace underscores
+    local desc="Configuration pour $name"
+    local icon="📦"
+    local target="$module_id"
+    local install_type="copy"
 
-    # Parse TOML using yq
-    local name=$(yq eval '.module.name' "$config_file" 2>/dev/null || echo "$module_id")
-    local desc=$(yq eval '.module.description' "$config_file" 2>/dev/null || echo "Configuration module")
-    local icon=$(yq eval '.module.icon' "$config_file" 2>/dev/null || echo "📦")
-    local target=$(yq eval '.paths.target' "$config_file" 2>/dev/null || echo "$module_id")
-    local install_type=$(yq eval '.installation.type' "$config_file" 2>/dev/null || echo "copy")
+    # Override with TOML if it exists
+    if [[ -f "$config_file" ]]; then
+        log_info "Using configz.toml for module: $module_id"
+        name=$(yq eval '.module.name' "$config_file" 2>/dev/null || echo "$name")
+        desc=$(yq eval '.module.description' "$config_file" 2>/dev/null || echo "$desc")
+        icon=$(yq eval '.module.icon' "$config_file" 2>/dev/null || echo "$icon")
+        target=$(yq eval '.paths.target' "$config_file" 2>/dev/null || echo "$target")
+        install_type=$(yq eval '.installation.type' "$config_file" 2>/dev/null || echo "$install_type")
+        MODULE_INFO["${module_id}_config"]="$config_file"
+    else
+        log_info "Using default configuration for module: $module_id"
+        MODULE_INFO["${module_id}_config"]=""
+    fi
 
     MODULE_INFO["${module_id}_name"]="$icon $name"
     MODULE_INFO["${module_id}_desc"]="$desc"
     MODULE_INFO["${module_id}_target"]="$target"
     MODULE_INFO["${module_id}_type"]="$install_type"
-    MODULE_INFO["${module_id}_config"]="$config_file"
 }
 
 # Initialize module discovery
@@ -139,12 +147,11 @@ init_module_discovery() {
         if [[ -d "$module_dir" ]]; then
             local module_id=$(basename "$module_dir")
 
-            # Skip if no configz.toml exists, but try to parse anyway
-            if parse_module_config "$module_id"; then
-                AVAILABLE_MODULES+=("$module_id")
-                MODULE_SELECTION["$module_id"]=0
-                log_info "Discovered module: $module_id"
-            fi
+            # Always try to parse module config (TOML is optional)
+            parse_module_config "$module_id"
+            AVAILABLE_MODULES+=("$module_id")
+            MODULE_SELECTION["$module_id"]=0
+            log_info "Discovered module: $module_id"
         fi
     done
 
@@ -154,65 +161,90 @@ init_module_discovery() {
     fi
 }
 
-# Show header
-show_header() {
+# Show header for selection phase
+show_selection_header() {
     clear
     echo -e "${BOLD}${CYAN}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BOLD}${CYAN}║                                                                              ║${NC}"
-    echo -e "${BOLD}${CYAN}║                          🎛️  CONFIGZ INSTALLER                             ║${NC}"
+    echo -e "${BOLD}${CYAN}║                     🎛️  PHASE 1: SÉLECTION DES MODULES                     ║${NC}"
     echo -e "${BOLD}${CYAN}║                                                                              ║${NC}"
-    echo -e "${BOLD}${CYAN}║              Sélectionnez les configurations à installer                    ║${NC}"
+    echo -e "${BOLD}${CYAN}║               Utilisez ↑↓ pour naviguer, ESPACE pour sélectionner          ║${NC}"
     echo -e "${BOLD}${CYAN}║                                                                              ║${NC}"
     echo -e "${BOLD}${CYAN}╚══════════════════════════════════════════════════════════════════════════════╝${NC}"
     echo
 }
 
-# Show interactive menu
-show_menu() {
-    show_header
+# Global variables for checkbox interface
+CURRENT_ITEM=0
+ITEMS_PER_PAGE=10
+
+# Show checkbox interface
+show_checkbox_interface() {
+    show_selection_header
+
+    local total_items=${#AVAILABLE_MODULES[@]}
+    local start_index=$((CURRENT_ITEM - CURRENT_ITEM % ITEMS_PER_PAGE))
+    local end_index=$((start_index + ITEMS_PER_PAGE - 1))
+    if [[ $end_index -ge $total_items ]]; then
+        end_index=$((total_items - 1))
+    fi
 
     echo -e "${BOLD}📦 Configurations disponibles :${NC}"
     echo
 
-    local index=1
-    for module_id in "${AVAILABLE_MODULES[@]}"; do
+    # Display items
+    for ((i=start_index; i<=end_index; i++)); do
+        local module_id="${AVAILABLE_MODULES[$i]}"
         local module_name="${MODULE_INFO[${module_id}_name]}"
         local module_desc="${MODULE_INFO[${module_id}_desc]}"
         local target_path="${MODULE_INFO[${module_id}_target]}"
 
-        local checkbox_icon status_text
+        # Checkbox state
+        local checkbox=""
         if [[ ${MODULE_SELECTION["$module_id"]} -eq 1 ]]; then
-            checkbox_icon="${GREEN}☑${NC}"
-            status_text="${GREEN}Sélectionné${NC}"
+            checkbox="${GREEN}[✓]${NC}"
         else
-            checkbox_icon="${RED}☐${NC}"
-            status_text="${RED}Non sélectionné${NC}"
+            checkbox="${DIM}[ ]${NC}"
         fi
 
-        # Check if already installed
+        # Selection highlight
+        local prefix=""
+        local suffix=""
+        if [[ $i -eq $CURRENT_ITEM ]]; then
+            prefix="${CYAN}▶ ${NC}"
+            checkbox="${BOLD}${checkbox}${NC}"
+        else
+            prefix="  "
+        fi
+
+        # Installation status
         local install_status=""
         if [[ -e "$TARGET_BASE_DIR/$target_path" ]]; then
-            install_status=" ${YELLOW}(Installé)${NC}"
+            install_status=" ${YELLOW}●${NC}"
         fi
 
-        echo -e "  $checkbox_icon ${BOLD}$index.${NC} $module_name"
-        echo -e "     ${DIM}$module_desc${NC}"
-        echo -e "     ${BLUE}└─${NC} Target: ${BOLD}~/.config/$target_path${NC}$install_status"
-        echo -e "     Status: $status_text"
+        echo -e "${prefix}${checkbox} ${BOLD}${module_name}${NC}${install_status}"
+        echo -e "    ${DIM}${module_desc}${NC}"
+        echo -e "    ${BLUE}→${NC} ~/.config/${target_path}"
         echo
-
-        ((index++))
     done
 
-    echo -e "${BOLD}🎮 Actions disponibles :${NC}"
-    echo -e "  ${YELLOW}1-${#AVAILABLE_TOOLS[@]}${NC} - Basculer la sélection d'un outil"
-    echo -e "  ${YELLOW}a${NC} - Tout sélectionner"
-    echo -e "  ${YELLOW}n${NC} - Tout désélectionner"
-    echo -e "  ${GREEN}i${NC} - Installer les configurations sélectionnées"
-    echo -e "  ${BLUE}s${NC} - Afficher le statut"
-    echo -e "  ${RED}q${NC} - Quitter"
+    # Show navigation info
+    local selected_count=0
+    for module in "${AVAILABLE_MODULES[@]}"; do
+        if [[ ${MODULE_SELECTION["$module"]} -eq 1 ]]; then
+            ((selected_count++))
+        fi
+    done
+
+    echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}📊 Sélectionnés: ${GREEN}$selected_count${NC}/$total_items  ${BOLD}Page: ${CYAN}$((start_index/ITEMS_PER_PAGE + 1))${NC}/$((($total_items-1)/ITEMS_PER_PAGE + 1))${NC}"
     echo
-    echo -e "${BOLD}Votre choix :${NC} "
+    echo -e "${BOLD}🎮 Contrôles :${NC}"
+    echo -e "  ${YELLOW}↑/k${NC} Haut    ${YELLOW}↓/j${NC} Bas    ${YELLOW}ESPACE${NC} Sélectionner    ${YELLOW}a${NC} Tout    ${YELLOW}n${NC} Rien"
+    echo -e "  ${GREEN}ENTRÉE${NC} Continuer    ${RED}q/ESC${NC} Quitter"
+    echo
+    echo -e "${DIM}Légende: ● = Déjà installé${NC}"
 }
 
 # Toggle tool selection
@@ -242,7 +274,6 @@ select_all() {
         MODULE_SELECTION["$module"]=1
     done
     echo -e "${GREEN}✓ Tous les modules sélectionnés${NC}"
-    sleep 1
 }
 
 # Deselect all modules
@@ -251,7 +282,6 @@ select_none() {
         MODULE_SELECTION["$module"]=0
     done
     echo -e "${YELLOW}○ Tous les modules désélectionnés${NC}"
-    sleep 1
 }
 
 # Get selected tools
@@ -268,48 +298,7 @@ get_selected_modules() {
 }
 
 # Show status
-show_status() {
-    clear
-    echo -e "${BOLD}${CYAN}📊 Status des Configurations${NC}"
-    echo "════════════════════════════════"
-    echo
 
-    local selected_count=0
-    local installed_count=0
-
-    for module_id in "${AVAILABLE_MODULES[@]}"; do
-        local module_name="${MODULE_INFO[${module_id}_name]}"
-        local target_path="${MODULE_INFO[${module_id}_target]}"
-
-        local selection_status install_status
-
-        if [[ ${MODULE_SELECTION["$module_id"]} -eq 1 ]]; then
-            selection_status="${GREEN}Sélectionné${NC}"
-            ((selected_count++))
-        else
-            selection_status="${DIM}Non sélectionné${NC}"
-        fi
-
-        if [[ -e "$TARGET_BASE_DIR/$target_path" ]]; then
-            install_status="${GREEN}Installé${NC}"
-        else
-            install_status="${DIM}Non installé${NC}"
-        fi
-
-        echo -e "  ${BOLD}$module_name${NC} - $selection_status ($install_status)"
-        echo -e "  Target: ${DIM}~/.config/$target_path${NC}"
-        echo
-    done
-
-    echo -e "${BOLD}Résumé :${NC}"
-    echo "  Total d'outils: ${#AVAILABLE_TOOLS[@]}"
-    echo "  Sélectionnés: $selected_count"
-    echo "  Installés: $installed_count"
-    echo
-
-    echo -e "Appuyez sur ${BOLD}Entrée${NC} pour continuer..."
-    read -r
-}
 
 # =============================================================================
 # INSTALLATION FUNCTIONS
@@ -362,7 +351,7 @@ install_starship() {
     log_success "Starship Prompt configuré ✓"
 }
 
-# Generic module installer using TOML configuration
+# Generic module installer using TOML configuration or defaults
 install_module() {
     local module_id="$1"
     local config_file="${MODULE_INFO[${module_id}_config]}"
@@ -375,44 +364,66 @@ install_module() {
     # Create target directory
     ensure_directory "$full_target"
 
-    # Handle backup based on TOML config
-    local backup_strategy=$(yq eval '.backup.strategy' "$config_file" 2>/dev/null || echo "auto")
+    # Handle backup
+    local backup_strategy="auto"
+    if [[ -n "$config_file" ]]; then
+        backup_strategy=$(yq eval '.backup.strategy' "$config_file" 2>/dev/null || echo "auto")
+    fi
+
     if [[ "$backup_strategy" != "none" && $NO_BACKUP -eq 0 ]]; then
         if [[ -d "$full_target" && "$(ls -A "$full_target" 2>/dev/null)" ]]; then
             backup_directory "$full_target"
         fi
     fi
 
-    # Get sources from TOML
-    local sources_count=$(yq eval '.paths.sources | length' "$config_file" 2>/dev/null || echo "0")
-    if [[ "$sources_count" -gt 0 ]]; then
-        for ((i=0; i<sources_count; i++)); do
-            local source=$(yq eval ".paths.sources[$i]" "$config_file")
-            local source_path="$CONFIG_SOURCE_DIR/$module_id/$source"
+    # Install files
+    if [[ -n "$config_file" ]]; then
+        # Use TOML configuration for sources
+        local sources_count=$(yq eval '.paths.sources | length' "$config_file" 2>/dev/null || echo "0")
+        if [[ "$sources_count" -gt 0 ]]; then
+            for ((i=0; i<sources_count; i++)); do
+                local source=$(yq eval ".paths.sources[$i]" "$config_file")
+                local source_path="$CONFIG_SOURCE_DIR/$module_id/$source"
 
-            if [[ -e "$source_path" ]]; then
-                case "$install_type" in
-                    "copy")
-                        cp -r "$source_path" "$full_target/"
-                        ;;
-                    "symlink")
-                        ln -sf "$source_path" "$full_target/"
-                        ;;
-                    *)
-                        log_error "Type d'installation non supporté: $install_type"
-                        return 1
-                        ;;
-                esac
-            else
-                log_warning "Source non trouvée: $source_path"
-            fi
-        done
+                if [[ -e "$source_path" ]]; then
+                    case "$install_type" in
+                        "copy")
+                            cp -r "$source_path" "$full_target/"
+                            ;;
+                        "symlink")
+                            ln -sf "$source_path" "$full_target/"
+                            ;;
+                        *)
+                            log_error "Type d'installation non supporté: $install_type"
+                            return 1
+                            ;;
+                    esac
+                else
+                    log_warning "Source non trouvée: $source_path"
+                fi
+            done
+        else
+            # TOML exists but no sources defined, use default behavior
+            install_module_default "$module_id" "$full_target"
+        fi
     else
-        # Fallback: copy all non-toml files
-        find "$CONFIG_SOURCE_DIR/$module_id" -type f ! -name "configz.toml" -exec cp {} "$full_target/" \;
+        # No TOML file, use default installation
+        install_module_default "$module_id" "$full_target"
     fi
 
     log_success "${MODULE_INFO[${module_id}_name]} configuré ✓"
+}
+
+# Default installation method (copy all non-toml files)
+install_module_default() {
+    local module_id="$1"
+    local full_target="$2"
+
+    # Copy all files except configz.toml
+    find "$CONFIG_SOURCE_DIR/$module_id" -type f ! -name "configz.toml" -exec cp -r {} "$full_target/" \; 2>/dev/null
+
+    # If there are subdirectories, copy them too
+    find "$CONFIG_SOURCE_DIR/$module_id" -mindepth 1 -type d -exec cp -r {} "$full_target/" \; 2>/dev/null
 }
 
 # Show installation confirmation
@@ -461,84 +472,294 @@ show_installation_confirmation() {
     echo -n "Votre choix [y/n/d]: "
 }
 
-# Run installation process
-run_installation() {
-    local selected_tools
-    mapfile -t selected_tools < <(get_selected_modules)
+# Preview what will be installed
+preview_installation() {
+    local selected_modules
+    mapfile -t selected_modules < <(get_selected_modules)
 
-    if [[ ${#selected_tools[@]} -eq 0 ]]; then
-        log_warning "Aucune configuration sélectionnée !"
-        echo -e "\nAppuyez sur ${BOLD}Entrée${NC} pour continuer..."
+    if [[ ${#selected_modules[@]} -eq 0 ]]; then
+        clear
+        echo -e "${BOLD}${YELLOW}⚠️  AUCUNE SÉLECTION${NC}"
+        echo "════════════════════════════"
+        echo
+        echo "Aucun module n'est sélectionné pour l'installation."
+        echo
+        echo -e "Appuyez sur ${BOLD}Entrée${NC} pour retourner au menu..."
         read -r
         return
     fi
 
-    # Show confirmation dialog
-    while true; do
-        show_installation_confirmation "${selected_tools[@]}"
-        read -r confirmation
+    clear
+    echo -e "${BOLD}${BLUE}👀 PREVIEW DE L'INSTALLATION${NC}"
+    echo "════════════════════════════════════"
+    echo
+    echo -e "${BOLD}Les modules suivants seront installés :${NC}"
+    echo
 
-        case "$confirmation" in
-            y|Y|yes|YES|oui|OUI)
-                break
-                ;;
-            n|N|no|NO|non|NON)
-                echo -e "\n${YELLOW}Installation annulée.${NC}"
-                sleep 1
-                return
-                ;;
-            d|D|detail|DETAIL)
-                show_installation_details "${selected_tools[@]}"
-                ;;
-            *)
-                echo -e "\n${RED}Réponse invalide. Utilisez y/n/d${NC}"
+    for module_id in "${selected_modules[@]}"; do
+        local module_name="${MODULE_INFO[${module_id}_name]}"
+        local module_desc="${MODULE_INFO[${module_id}_desc]}"
+        local target_path="${MODULE_INFO[${module_id}_target]}"
+        local full_target="$TARGET_BASE_DIR/$target_path"
+
+        echo -e "  ${GREEN}▶${NC} ${BOLD}$module_name${NC}"
+        echo -e "     ${DIM}$module_desc${NC}"
+        echo -e "     ${BLUE}→${NC} Destination: ${BOLD}~/.config/$target_path${NC}"
+
+        # Check if target exists
+        if [[ -e "$full_target" ]]; then
+            if [[ $NO_BACKUP -eq 0 ]]; then
+                echo -e "     ${YELLOW}⚠${NC} Fichiers existants seront sauvegardés"
+            else
+                echo -e "     ${RED}⚠${NC} Fichiers existants seront écrasés (--no-backup)"
+            fi
+        else
+            echo -e "     ${GREEN}✓${NC} Nouvelle installation"
+        fi
+        echo
+    done
+
+    echo -e "${BOLD}Actions prévues :${NC}"
+    echo "• Création des dossiers nécessaires"
+    if [[ $NO_BACKUP -eq 0 ]]; then
+        echo "• Sauvegarde automatique des configurations existantes"
+    fi
+    echo "• Copie des nouvelles configurations"
+    echo "• Affichage des notes post-installation"
+    echo
+
+    echo -e "Appuyez sur ${BOLD}Entrée${NC} pour retourner au menu..."
+    read -r
+}
+
+# Handle keyboard input for checkbox interface
+handle_checkbox_input() {
+    local key="$1"
+    local total_items=${#AVAILABLE_MODULES[@]}
+
+    case "$key" in
+        # Navigation
+        "k"|$'\033[A')  # Up arrow or k
+            if [[ $CURRENT_ITEM -gt 0 ]]; then
+                ((CURRENT_ITEM--))
+            else
+                CURRENT_ITEM=$((total_items - 1))  # Wrap to bottom
+            fi
+            ;;
+        "j"|$'\033[B')  # Down arrow or j
+            if [[ $CURRENT_ITEM -lt $((total_items - 1)) ]]; then
+                ((CURRENT_ITEM++))
+            else
+                CURRENT_ITEM=0  # Wrap to top
+            fi
+            ;;
+        " ")  # Spacebar - toggle selection
+            local module_id="${AVAILABLE_MODULES[$CURRENT_ITEM]}"
+            if [[ ${MODULE_SELECTION["$module_id"]} -eq 1 ]]; then
+                MODULE_SELECTION["$module_id"]=0
+            else
+                MODULE_SELECTION["$module_id"]=1
+            fi
+            ;;
+        "a"|"A")  # Select all
+            select_all
+            ;;
+        "n"|"N")  # Select none
+            select_none
+            ;;
+        $'\n'|$'\r')  # Enter - continue to installation
+            # Check if at least one module is selected
+            local selected_count=0
+            for module in "${AVAILABLE_MODULES[@]}"; do
+                if [[ ${MODULE_SELECTION["$module"]} -eq 1 ]]; then
+                    ((selected_count++))
+                fi
+            done
+
+            if [[ $selected_count -eq 0 ]]; then
+                # Show error message briefly
+                echo -e "\n${YELLOW}⚠️  Sélectionnez au moins un module avant de continuer !${NC}"
                 sleep 2
+                return 2  # Stay in selection mode
+            else
+                return 0  # Proceed to installation
+            fi
+            ;;
+        "q"|"Q"|$'\033')  # q, Q, or ESC - quit
+            return 1
+            ;;
+        *)
+            # Invalid key, do nothing
+            ;;
+    esac
+    return 2  # Continue selection
+}
+
+# Read single key without pressing Enter
+read_single_key() {
+    local key
+    # Save terminal settings
+    local old_settings=$(stty -g)
+    # Set terminal to raw mode
+    stty raw -echo min 0 time 10
+    # Read single character
+    key=$(dd bs=1 count=1 2>/dev/null)
+    # Handle escape sequences (arrow keys)
+    if [[ "$key" == $'\033' ]]; then
+        key+=$(dd bs=2 count=1 2>/dev/null)
+    fi
+    # Restore terminal settings
+    stty "$old_settings"
+    echo "$key"
+}
+
+# Phase 1: Selection interface with checkbox navigation
+run_selection_phase() {
+    CURRENT_ITEM=0  # Reset to first item
+
+    while true; do
+        show_checkbox_interface
+
+        local key
+        key=$(read_single_key)
+
+        local result
+        handle_checkbox_input "$key"
+        result=$?
+
+        case $result in
+            0)  # Continue to installation
+                return 0  # Exit selection phase
+                ;;
+            1)  # Quit
+                clear
+                echo -e "${BOLD}${CYAN}👋 Au revoir !${NC}"
+                echo -e "${DIM}Merci d'avoir utilisé Configz Installer${NC}"
+                exit 0
+                ;;
+            2)  # Continue in selection mode
                 ;;
         esac
     done
+}
+
+# Phase 2: Installation interface
+run_installation_phase() {
+    local selected_modules
+    mapfile -t selected_modules < <(get_selected_modules)
+
+    while true; do
+        clear
+        echo -e "${BOLD}${CYAN}🔧 PHASE 2: INSTALLATION${NC}"
+        echo "═══════════════════════════════"
+        echo
+        echo -e "${BOLD}Modules sélectionnés: ${GREEN}${#selected_modules[@]}${NC}"
+        echo
+
+        for module_id in "${selected_modules[@]}"; do
+            local module_name="${MODULE_INFO[${module_id}_name]}"
+            local module_desc="${MODULE_INFO[${module_id}_desc]}"
+            local target_path="${MODULE_INFO[${module_id}_target]}"
+
+            echo -e "  ${GREEN}▶${NC} ${BOLD}$module_name${NC}"
+            echo -e "     ${DIM}$module_desc${NC}"
+            echo -e "     ${BLUE}→${NC} ~/.config/$target_path"
+            echo
+        done
+
+        echo -e "${BOLD}🎯 Actions disponibles :${NC}"
+        echo -e "  ${GREEN}i${NC} - Installer maintenant"
+        echo -e "  ${YELLOW}p${NC} - Preview simple"
+        echo -e "  ${YELLOW}d${NC} - Détails avancés"
+        echo -e "  ${BLUE}b${NC} - Retour à la sélection"
+        echo -e "  ${RED}q${NC} - Quitter"
+        echo
+        echo -n -e "${BOLD}Votre choix :${NC} "
+
+        read -r choice
+        case "$choice" in
+            i|I)
+                run_installation "${selected_modules[@]}"
+                break
+                ;;
+            p|P)
+                preview_installation
+                ;;
+            d|D)
+                show_installation_details "${selected_modules[@]}"
+                ;;
+            b|B)
+                return 1  # Return to selection phase
+                ;;
+            q|Q)
+                clear
+                echo -e "${BOLD}${CYAN}👋 Au revoir !${NC}"
+                exit 0
+                ;;
+            *)
+                echo -e "\n${RED}Option invalide: $choice${NC}"
+                sleep 1
+                ;;
+        esac
+    done
+}
+
+# Run the actual installation process
+run_installation() {
+    local selected_modules=("$@")
 
     clear
-    echo -e "${BOLD}${CYAN}🚀 Installation en cours...${NC}"
+    echo -e "${BOLD}${CYAN}🚀 INSTALLATION EN COURS${NC}"
+    echo "═════════════════════════════"
     echo
-    echo "Outils sélectionnés: ${selected_tools[*]}"
+    echo -e "Installation de ${BOLD}${#selected_modules[@]}${NC} module(s)..."
     echo
 
     # Ensure target directory exists
     ensure_directory "$TARGET_BASE_DIR"
 
-    # Install each selected tool
+    # Install each selected module with progress
     local success_count=0
-    local failed_tools=()
+    local failed_modules=()
+    local current=1
+    local total=${#selected_modules[@]}
 
-    for tool_id in "${selected_tools[@]}"; do
-        echo -e "${BOLD}[${tool_id}]${NC} Installation..."
+    for module_id in "${selected_modules[@]}"; do
+        local module_name="${MODULE_INFO[${module_id}_name]}"
 
-        if install_module "$tool_id"; then
+        echo -e "${BOLD}[$current/$total]${NC} $module_name"
+        echo -n "  → Installation en cours... "
+
+        if install_module "$module_id"; then
+            echo -e "${GREEN}✓ Réussi${NC}"
             ((success_count++))
         else
-            failed_tools+=("$tool_id")
+            echo -e "${RED}✗ Échec${NC}"
+            failed_modules+=("$module_id")
         fi
+
+        ((current++))
         echo
     done
 
-    # Show summary
-    echo -e "${BOLD}${GREEN}✨ Installation terminée !${NC}"
-    echo "═══════════════════════════════"
-    echo "Réussis: $success_count/${#selected_tools[@]}"
+    # Show final summary
+    echo
+    echo -e "${BOLD}${GREEN}✨ INSTALLATION TERMINÉE${NC}"
+    echo "═══════════════════════════"
+    echo -e "Réussis: ${GREEN}$success_count${NC}/$total"
 
-    if [[ ${#failed_tools[@]} -gt 0 ]]; then
-        echo "Échecs: ${failed_tools[*]}"
+    if [[ ${#failed_modules[@]} -gt 0 ]]; then
+        echo -e "Échecs: ${RED}${#failed_modules[@]}${NC} (${failed_modules[*]})"
     fi
     echo
 
     # Show post-installation notes
-    show_post_install_notes "${selected_tools[@]}"
-
-    # Only wait for input if running interactively
-    if [[ -t 0 ]]; then
-        echo -e "Appuyez sur ${BOLD}Entrée${NC} pour continuer..."
-        read -r
+    if [[ $success_count -gt 0 ]]; then
+        show_post_install_notes "${selected_modules[@]}"
     fi
+
+    echo -e "Appuyez sur ${BOLD}Entrée${NC} pour quitter..."
+    read -r
 }
 
 # Show installation details
@@ -562,23 +783,34 @@ show_installation_details() {
         echo -e "Source      : ${DIM}$full_source${NC}"
         echo -e "Destination : ${DIM}$full_target${NC}"
 
-        # Show source files
+        # Show source files (macOS compatible)
         if [[ -d "$full_source" ]]; then
             echo -e "Fichiers    : ${DIM}"
-            find "$full_source" -type f -printf "              %P\n" 2>/dev/null | head -5
-            local file_count=$(find "$full_source" -type f 2>/dev/null | wc -l)
+            find "$full_source" -type f ! -name "configz.toml" | head -5 | while read -r file; do
+                local rel_path=${file#$full_source/}
+                echo "              $rel_path"
+            done
+            local file_count=$(find "$full_source" -type f ! -name "configz.toml" | wc -l | tr -d ' ')
             if [[ $file_count -gt 5 ]]; then
                 echo -e "              ... et $((file_count - 5)) autres fichiers"
             fi
             echo -e "${NC}"
         fi
 
-        # Check target status
+        # Check target status (macOS compatible)
         if [[ -e "$full_target" ]]; then
-            local mod_time=$(stat -c %Y "$full_target" 2>/dev/null || echo "0")
-            local mod_date=$(date -d "@$mod_time" "+%Y-%m-%d %H:%M" 2>/dev/null || echo "inconnu")
+            local mod_date
+            if [[ -f "$full_target" ]]; then
+                mod_date=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M" "$full_target" 2>/dev/null || echo "inconnu")
+            else
+                mod_date=$(stat -f "%Sm" -t "%Y-%m-%d %H:%M" "$full_target" 2>/dev/null || echo "inconnu")
+            fi
             echo -e "Status      : ${YELLOW}Existe déjà (modifié le $mod_date)${NC}"
-            echo -e "Action      : ${YELLOW}Backup + Remplacement${NC}"
+            if [[ $NO_BACKUP -eq 0 ]]; then
+                echo -e "Action      : ${YELLOW}Backup + Remplacement${NC}"
+            else
+                echo -e "Action      : ${RED}Écrasement direct (--no-backup)${NC}"
+            fi
         else
             echo -e "Status      : ${GREEN}Nouveau${NC}"
             echo -e "Action      : ${GREEN}Installation${NC}"
@@ -647,50 +879,19 @@ main() {
 
     log_info "Modules disponibles: ${#AVAILABLE_MODULES[@]} (${AVAILABLE_MODULES[*]})"
 
+    # Main loop: Selection -> Installation
     while true; do
-        show_menu
-        read -r choice
+        # Phase 1: Selection
+        run_selection_phase
 
-        case "$choice" in
-            [1-9])
-                if ! toggle_selection "$choice"; then
-                    echo "Option invalide: $choice"
-                    sleep 1
-                fi
-                ;;
-            [1-9][0-9])
-                if ! toggle_selection "$choice"; then
-                    echo "Option invalide: $choice"
-                    sleep 1
-                fi
-                ;;
-            a|A)
-                select_all
-                ;;
-            n|N)
-                select_none
-                ;;
-            i|I)
-                run_installation
-                ;;
-            s|S)
-                show_status
-                ;;
-            q|Q)
-                clear
-                echo -e "${BOLD}${CYAN}👋 Au revoir !${NC}"
-                echo -e "${DIM}Merci d'avoir utilisé Configz Installer${NC}"
-                exit 0
-                ;;
-            "")
-                # Empty input, just refresh
-                ;;
-            *)
-                echo "Option invalide: '$choice'"
-                echo "Utilisez 1-${#AVAILABLE_TOOLS[@]}, a, n, i, s, ou q"
-                sleep 2
-                ;;
-        esac
+        # Phase 2: Installation
+        if ! run_installation_phase; then
+            # User chose to go back to selection
+            continue
+        else
+            # Installation completed, exit
+            break
+        fi
     done
 }
 
