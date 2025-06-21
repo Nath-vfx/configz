@@ -1,10 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Configz - Installation Script
 # Interactive configuration deployment tool
 # Version: 2.0 (Simplified)
 
-set -e
+# set -e
 
 # =============================================================================
 # CONFIGURATION AND SETUP
@@ -21,6 +21,7 @@ TARGET_BASE_DIR="$HOME/.config"
 
 # Installation mode
 DRY_RUN=${DRY_RUN:-0}
+NO_BACKUP=${NO_BACKUP:-0}
 
 # =============================================================================
 # COLORS AND LOGGING
@@ -69,6 +70,10 @@ ensure_directory() {
 # Create backup of a file
 backup_file() {
     local file="$1"
+    if [[ $NO_BACKUP -eq 1 ]]; then
+        log_info "Backup désactivé pour: $file"
+        return 0
+    fi
     if [[ -f "$file" ]]; then
         local backup_file="${file}.backup.$(date +%Y%m%d_%H%M%S)"
         cp "$file" "$backup_file"
@@ -79,6 +84,10 @@ backup_file() {
 # Create backup of a directory
 backup_directory() {
     local dir="$1"
+    if [[ $NO_BACKUP -eq 1 ]]; then
+        log_info "Backup désactivé pour le dossier: $dir"
+        return 0
+    fi
     if [[ -d "$dir" && "$(ls -A "$dir")" ]]; then
         local backup_dir="${dir}.backup.$(date +%Y%m%d_%H%M%S)"
         cp -r "$dir" "$backup_dir"
@@ -467,8 +476,11 @@ run_installation() {
     # Show post-installation notes
     show_post_install_notes "${selected_tools[@]}"
 
-    echo -e "Appuyez sur ${BOLD}Entrée${NC} pour continuer..."
-    read -r
+    # Only wait for input if running interactively
+    if [[ -t 0 ]]; then
+        echo -e "Appuyez sur ${BOLD}Entrée${NC} pour continuer..."
+        read -r
+    fi
 }
 
 # Show installation details
@@ -558,9 +570,19 @@ show_post_install_notes() {
 
 # Main function
 main() {
+    parse_args "$@"
+
     log_info "Démarrage de Configz Installer..."
     log_info "Répertoire source: $PROJECT_ROOT"
     log_info "Répertoire cible: $TARGET_BASE_DIR"
+
+    if [[ $NO_BACKUP -eq 1 ]]; then
+        log_warning "Mode sans backup activé - aucune sauvegarde ne sera créée"
+    fi
+
+    if [[ $DRY_RUN -eq 1 ]]; then
+        log_warning "Mode simulation activé - aucune modification ne sera effectuée"
+    fi
 
     # Initialize tool selection
     init_tool_selection
@@ -613,6 +635,48 @@ main() {
         esac
     done
 }
+
+# Parse command line arguments
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --no-backup)
+                NO_BACKUP=1
+                shift
+                ;;
+            --dry-run)
+                DRY_RUN=1
+                shift
+                ;;
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            *)
+                echo "Option inconnue: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+}
+
+# Show help message
+show_help() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --no-backup    Désactive la création des archives de sauvegarde"
+    echo "  --dry-run      Mode simulation (affiche les actions sans les exécuter)"
+    echo "  -h, --help     Affiche cette aide"
+    echo ""
+    echo "Exemples:"
+    echo "  $0                # Installation normale avec backup"
+    echo "  $0 --no-backup   # Installation sans backup"
+    echo "  $0 --dry-run     # Simulation des actions"
+}
+
+
 
 # Launch the script
 main "$@"
