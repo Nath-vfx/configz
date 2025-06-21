@@ -2,14 +2,28 @@
 
 Gestionnaire de configurations personnel avec système d'auto-découverte et interface moderne par cases à cocher.
 
+> 🚀 **Nouveau !** CLI moderne disponible en version **0.2.0-alpha** - Voir [CLI_GUIDE.md](CLI_GUIDE.md)
+
 ## 🚀 Installation Ultra-Rapide
 
+### Interface Interactive (Stable)
 ```bash
 # Lancer l'installateur interactif moderne
 ./install.sh
 
 # Ou utiliser le raccourci
 ./setup
+```
+
+### CLI Moderne (Alpha)
+```bash
+# Installer le CLI globalement
+./install-cli.sh
+
+# Utilisation
+configz list
+configz install
+configz info fish
 ```
 
 ## ✨ Fonctionnalités
@@ -244,3 +258,26 @@ EOF
 Après installation, redémarrez vos applications ou suivez les notes spécifiques à chaque module affichées en fin d'installation.
 
 **C'est tout !** 🎉 Votre système de configuration modulaire est prêt à l'emploi.
+
+## 🆕 CLI Moderne (v0.2.0-alpha)
+
+Une nouvelle interface en ligne de commande est disponible avec :
+
+- ✨ **Commandes modernes** : `list`, `install`, `status`, `info`
+- 🎯 **Options avancées** : `--json`, `--dry-run`, `--verbose`
+- 🔧 **Auto-complétion** : Support Bash/Zsh/Fish
+- 📊 **Formats multiples** : Texte coloré et JSON
+- 🛡️ **Gestion d'erreurs** : Messages clairs et debugging
+
+```bash
+# Installation du CLI
+./install-cli.sh
+
+# Exemples d'usage
+configz list --installed
+configz install fish starship --dry-run
+configz status --detailed
+configz info --all nvim
+```
+
+Voir le [Guide CLI complet](CLI_GUIDE.md) pour tous les détails !
