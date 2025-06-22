@@ -1,5 +1,0 @@
-#!/bin/bash
-
-# Configz Setup - Quick launcher for the simplified installer
-# One command to rule them all
-exec "$(dirname "$0")/install.sh" "$@"

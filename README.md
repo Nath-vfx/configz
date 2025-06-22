@@ -1,283 +1,267 @@
-# Configz - Gestionnaire de Configurations Modulaire
+# Configz - Modern Configuration Management CLI
 
-Gestionnaire de configurations personnel avec système d'auto-découverte et interface moderne par cases à cocher.
+A modern, modular configuration management system for your dotfiles and application configurations.
 
-> 🚀 **Nouveau !** CLI moderne disponible en version **0.2.0-alpha** - Voir [CLI_GUIDE.md](CLI_GUIDE.md)
+## 🚀 Quick Start
 
-## 🚀 Installation Ultra-Rapide
+### Installation
 
-### Interface Interactive (Stable)
 ```bash
-# Lancer l'installateur interactif moderne
-./install.sh
+# Clone the repository
+git clone https://github.com/yourusername/configz.git
+cd configz
 
-# Ou utiliser le raccourci
-./setup
-```
-
-### CLI Moderne (Alpha)
-```bash
-# Installer le CLI globalement
+# Install the CLI globally
 ./install-cli.sh
 
-# Utilisation
+# Start using it
 configz list
-configz install
-configz info fish
 ```
 
-## ✨ Fonctionnalités
-
-- 🎯 **Interface moderne** avec navigation par flèches (↑↓) et sélection par espace
-- 📦 **Auto-découverte** - Détecte automatiquement tous les modules dans `config/`
-- ⚙️ **Configuration optionnelle** - Fonctionne avec ou sans fichiers `configz.toml`
-- 🔒 **Backups automatiques** avec horodatage des configurations existantes
-- 🎨 **Interface colorée** et intuitive en 2 phases distinctes
-- 🔧 **Extensibilité infinie** - Ajoutez un dossier = nouveau module disponible
-- ⚡ **Installation en batch** avec barre de progression
-
-## 📁 Structure
-
-```
-configz/
-├── config/                  # 📦 Modules de configuration
-│   ├── fish/
-│   │   ├── config.fish      # Configuration Fish shell
-│   │   └── configz.toml     # (optionnel) Métadonnées du module
-│   ├── ghostty/
-│   │   ├── config           # Configuration Ghostty
-│   │   ├── theme/main       # Thème personnalisé
-│   │   └── configz.toml     # Configuration du module
-│   ├── starship/
-│   │   ├── starship.toml    # Configuration Starship
-│   │   └── configz.toml     # Métadonnées
-│   ├── nvim/
-│   │   ├── init.lua         # Configuration Neovim
-│   │   └── configz.toml     # Configuration avancée
-│   └── your_tool/           # 🆕 Ajoutez votre module ici !
-│       ├── config.file      # Vos fichiers de config
-│       └── configz.toml     # (optionnel) Personnalisation
-├── install.sh              # 🎯 INSTALLATEUR PRINCIPAL
-├── setup                   # ⚡ Raccourci rapide
-└── README.md              # Documentation
-```
-
-## 🎮 Interface Moderne
-
-### Phase 1 : Sélection Interactive
-```
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                     🎛️  PHASE 1: SÉLECTION DES MODULES                     ║
-║               Utilisez ↑↓ pour naviguer, ESPACE pour sélectionner          ║
-╚══════════════════════════════════════════════════════════════════════════════╝
-
-📦 Configurations disponibles :
-
-▶ [✓] 🐟 Fish Shell
-    Shell interactif moderne avec autocomplétion intelligente
-    → ~/.config/fish
-
-  [ ] 👻 Ghostty Terminal ●
-    Terminal haute performance avec rendu GPU
-    → ~/.config/ghostty
-
-  [✓] ⭐ Starship Prompt
-    Prompt cross-shell rapide et personnalisable
-    → ~/.config/starship
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📊 Sélectionnés: 2/4  Page: 1/1
-
-🎮 Contrôles :
-  ↑/k Haut    ↓/j Bas    ESPACE Sélectionner    a Tout    n Rien
-  ENTRÉE Continuer    q/ESC Quitter
-```
-
-### Phase 2 : Installation
-```
-🔧 PHASE 2: INSTALLATION
-═══════════════════════════════
-
-Modules sélectionnés: 2
-
-  ▶ 🐟 Fish Shell
-     Shell interactif moderne avec autocomplétion intelligente
-     → ~/.config/fish
-
-  ▶ ⭐ Starship Prompt
-     Prompt cross-shell rapide et personnalisable
-     → ~/.config/starship
-
-🎯 Actions disponibles :
-  i - Installer maintenant
-  p - Preview simple
-  d - Détails avancés
-  b - Retour à la sélection
-  q - Quitter
-```
-
-## 🔧 Utilisation
-
-### Options en ligne de commande
+### First Time Setup
 
 ```bash
-./install.sh                # Installation normale avec backup
-./install.sh --no-backup   # Installation sans sauvegarde
-./install.sh --dry-run     # Mode simulation
-./install.sh --help        # Afficher l'aide
+# Create your modules directory (first time only)
+mkdir -p ~/.config/configz/modules
+
+# List available modules (will be empty initially)
+configz list
+
+# Create your first module
+configz init my-app
 ```
 
-### Navigation par clavier
+## ✨ Features
 
-- **↑/↓ ou k/j** : Naviguer dans la liste
-- **ESPACE** : Sélectionner/désélectionner
-- **a** : Tout sélectionner
-- **n** : Tout désélectionner
-- **ENTRÉE** : Continuer vers l'installation
-- **q/ESC** : Quitter
+- 🎯 **Modern CLI** with intuitive commands and colorful output
+- 📦 **Auto-discovery** - Automatically detects modules in your modules directory
+- ⚙️ **Flexible configuration** - Works with or without `configz.toml` files
+- 🔒 **Automatic backups** with timestamped backups of existing configurations
+- 🎨 **Rich output** with icons, colors, and detailed information
+- 🔧 **Extensible** - Add a directory = new module available
+- ⚡ **Batch operations** with progress indicators
+- 🛠️ **Customizable paths** - Use any directory for your modules
 
-## 📦 Système Modulaire
+## 📁 Default Structure
 
-### Auto-découverte
+```
+~/.config/configz/
+├── modules/                   # Your configuration modules
+│   ├── fish/                  # Fish shell configuration
+│   │   ├── config.fish        # Configuration files
+│   │   └── configz.toml       # (optional) Module metadata
+│   ├── nvim/                  # Neovim configuration
+│   │   ├── init.lua           # Configuration files
+│   │   └── configz.toml       # Module settings
+│   └── starship/              # Starship prompt
+│       ├── starship.toml      # Configuration files
+│       └── configz.toml       # Module metadata
+├── backups/                   # Automatic backups
+└── config.toml               # Global configz settings
+```
 
-Le système détecte automatiquement tous les dossiers dans `config/` et les propose comme modules installables. Aucune configuration manuelle requise !
+## 🎮 Basic Usage
 
-### Configuration avancée avec `configz.toml`
+### List Modules
+```bash
+configz list                   # List all modules
+configz list --installed       # Show only installed modules
+configz list --json           # JSON output for scripting
+```
 
-Pour personnaliser un module, créez un fichier `configz.toml` dans son dossier :
+### Install Modules
+```bash
+configz install fish          # Install single module
+configz install fish nvim      # Install multiple modules
+configz install --all          # Install all modules
+configz install --dry-run fish # Preview what would be installed
+```
 
-```toml
+### Module Information
+```bash
+configz info fish              # Show detailed module info
+configz status                 # Show installation status of all modules
+```
+
+### Custom Directories
+```bash
+# Use custom modules directory
+configz --modules-dir ~/my-configs list
+
+# Use custom target directory
+configz --config-dir ~/custom-config install fish
+```
+
+## 📖 Creating Modules
+
+### Simple Module (Auto-detected)
+```bash
+# Create directory and add files
+mkdir -p ~/.config/configz/modules/myapp
+echo "setting=value" > ~/.config/configz/modules/myapp/config.conf
+
+# Module is now available
+configz list
+```
+
+### Advanced Module (With Metadata)
+```bash
+# Create module directory
+mkdir -p ~/.config/configz/modules/myapp
+
+# Create configuration files
+echo "setting=value" > ~/.config/configz/modules/myapp/config.conf
+
+# Create metadata file
+cat > ~/.config/configz/modules/myapp/configz.toml << 'EOF'
 [module]
-name = "Mon Super Outil"
-description = "Description détaillée de l'outil"
+name = "My Application"
+description = "Custom configuration for my app"
 icon = "🚀"
 version = "1.0.0"
-author = "Votre Nom"
+author = "Your Name"
 
 [installation]
-type = "copy"  # ou "symlink"
+type = "copy"  # or "symlink"
 
 [paths]
-target = "mon-outil"  # Dossier dans ~/.config/
-sources = ["config.yml", "themes/"]
+target = "myapp"  # Will install to ~/.config/myapp/
+sources = ["config.conf"]
 
 [dependencies]
-system = ["mon-outil"]  # Paquets requis
-modules = []  # Autres modules configz requis
+system = ["myapp"]  # Required system packages
+modules = []        # Required other configz modules
 
 [post_install]
 notes = [
-    "Redémarrez l'application",
-    "Exécutez: mon-outil --reload"
+    "Don't forget to restart myapp",
+    "Check the configuration with: myapp --check-config"
 ]
 
 [backup]
-strategy = "auto"  # "auto", "manual", "none"
-files = ["config.yml"]
-directories = ["themes"]
-```
-
-### Configuration par défaut (sans configz.toml)
-
-Si aucun `configz.toml` n'existe, le système utilise des valeurs par défaut intelligentes :
-
-- **Nom** : Nom du dossier capitalisé
-- **Description** : "Configuration pour [Nom]"
-- **Icône** : 📦
-- **Installation** : Copie tous les fichiers (sauf configz.toml)
-- **Destination** : `~/.config/[nom-du-dossier]`
-
-## 🆕 Ajouter un Nouveau Module
-
-C'est ultra simple ! Créez juste un dossier dans `config/` :
-
-```bash
-# Étape 1 : Créer le dossier
-mkdir config/my-awesome-tool
-
-# Étape 2 : Ajouter vos fichiers de config
-cp ~/my-config.yml config/my-awesome-tool/
-
-# Étape 3 : (Optionnel) Personnaliser
-cat > config/my-awesome-tool/configz.toml << EOF
-[module]
-name = "My Awesome Tool"
-description = "Configuration pour mon outil génial"
-icon = "🔧"
+strategy = "auto"  # "auto", "manual", or "none"
+files = ["config.conf"]
 EOF
-
-# C'est tout ! Votre module apparaît automatiquement dans l'installateur
-./install.sh
 ```
 
-## 🔒 Sécurité et Backups
+## 🔧 Advanced Features
 
-- **Backups automatiques** : `config.fish.backup.20241220_143022`
-- **Mode sans backup** : `--no-backup` pour éviter les sauvegardes
-- **Preview détaillé** : Voyez exactement quels fichiers seront copiés
-- **Installation non-destructive** : Toujours possible de revenir en arrière
-
-## 🎯 Exemples d'utilisation
-
-### Installation interactive complète
+### Environment Variables
 ```bash
-./install.sh
-# Sélectionnez vos modules avec ↑↓ et ESPACE
-# Appuyez sur ENTRÉE pour installer
+export CONFIGZ_MODULES_DIR="~/my-configs"  # Custom modules directory
+export CONFIGZ_CONFIG_DIR="~/my-dotfiles"  # Custom target directory
 ```
 
-### Installation rapide sans backup
-```bash
-./install.sh --no-backup
+### Global Configuration
+Create `~/.config/configz/config.toml`:
+```toml
+[default]
+modules_dir = "~/.config/configz/modules"
+config_dir = "~/.config"
+backup_strategy = "auto"
+
+[install]
+create_backups = true
+force_overwrite = false
+dry_run = false
+
+[display]
+show_icons = true
+colored_output = true
+verbose = false
 ```
 
-### Simulation pour voir ce qui sera installé
+## 📚 Commands Reference
+
+| Command | Description |
+|---------|-------------|
+| `list` | List available modules |
+| `install` | Install configuration modules |
+| `remove` | Remove installed modules |
+| `status` | Show installation status |
+| `info` | Show detailed module information |
+| `backup` | Create backups of configurations |
+| `restore` | Restore from backups |
+| `init` | Create new module template |
+| `doctor` | Check system health |
+| `migrate` | Migrate from old structure |
+
+## 🎯 Examples
+
 ```bash
-./install.sh --dry-run
+# Basic workflow
+configz list                           # See what's available
+configz info fish                      # Get details about fish module
+configz install fish                   # Install fish configuration
+configz status                         # Check what's installed
+
+# Advanced usage
+configz --modules-dir ~/work-configs install --dry-run --verbose fish
+configz backup fish                    # Backup before changes
+configz remove fish                    # Remove when no longer needed
+configz restore fish                   # Restore from backup
+
+# Batch operations
+configz install fish nvim starship     # Install multiple modules
+configz install --all                  # Install everything
+configz remove --all                   # Remove everything
+
+# Development workflow
+configz init mynewapp                  # Create new module template
+configz doctor                         # Check for issues
+configz migrate ~/old-dotfiles         # Migrate existing configs
 ```
 
-## 🔧 Prérequis
+## 🛠️ Global Options
 
-- **Bash 4.0+** (pour les tableaux associatifs)
-- **yq** (installé automatiquement via Homebrew si absent)
-- Commandes standard : `cp`, `mkdir`, `find`
+| Option | Description |
+|--------|-------------|
+| `-h, --help` | Show help message |
+| `-V, --version` | Show version information |
+| `-v, --verbose` | Enable verbose output |
+| `-q, --quiet` | Suppress non-error output |
+| `-n, --dry-run` | Show what would be done without executing |
+| `--no-backup` | Skip automatic backups |
+| `-f, --force` | Force operations without confirmation |
+| `--config-dir DIR` | Use custom config directory |
+| `--modules-dir DIR` | Use custom modules directory |
 
-## 🌟 Avantages
-
-✅ **Extensibilité infinie** - Ajoutez un dossier = nouveau module  
-✅ **Interface moderne** - Navigation intuitive par clavier  
-✅ **Auto-découverte** - Zéro configuration manuelle  
-✅ **Deux phases distinctes** - Sélection puis installation  
-✅ **Backups automatiques** - Zéro risque de perte  
-✅ **Configuration optionnelle** - Fonctionne out-of-the-box  
-✅ **Preview détaillé** - Transparence totale  
-✅ **Compatible** - Tous systèmes Unix/Linux/macOS  
-
-## 📋 Déploiement
-
-Après installation, redémarrez vos applications ou suivez les notes spécifiques à chaque module affichées en fin d'installation.
-
-**C'est tout !** 🎉 Votre système de configuration modulaire est prêt à l'emploi.
-
-## 🆕 CLI Moderne (v0.2.0-alpha)
-
-Une nouvelle interface en ligne de commande est disponible avec :
-
-- ✨ **Commandes modernes** : `list`, `install`, `status`, `info`
-- 🎯 **Options avancées** : `--json`, `--dry-run`, `--verbose`
-- 🔧 **Auto-complétion** : Support Bash/Zsh/Fish
-- 📊 **Formats multiples** : Texte coloré et JSON
-- 🛡️ **Gestion d'erreurs** : Messages clairs et debugging
+## 🏗️ Development
 
 ```bash
-# Installation du CLI
+# Clone and setup
+git clone https://github.com/yourusername/configz.git
+cd configz
+
+# Test locally (without installing)
+./configz list
+
+# Install for development
 ./install-cli.sh
 
-# Exemples d'usage
-configz list --installed
-configz install fish starship --dry-run
-configz status --detailed
-configz info --all nvim
+# Check system health
+configz doctor
 ```
 
-Voir le [Guide CLI complet](CLI_GUIDE.md) pour tous les détails !
+## 📜 License
+
+MIT License - see LICENSE file for details.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 📖 Documentation
+
+- **[Getting Started](docs/user-guide/getting-started.md)** - Quick setup and first steps
+- **[CLI Reference](docs/user-guide/cli-reference.md)** - Complete command documentation  
+- **[Examples](docs/user-guide/examples.md)** - Real-world usage examples
+- **[Adding Modules](docs/developer-guide/adding-modules.md)** - Create your own modules
+- **[Contributing](docs/developer-guide/contributing.md)** - How to contribute
+- **[Changelog](docs/CHANGELOG.md)** - Version history
+
+For complete documentation, visit the [docs](docs/) directory.

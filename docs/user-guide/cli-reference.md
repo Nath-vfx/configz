@@ -4,6 +4,20 @@
 
 Un CLI moderne et modulaire pour gérer tes configurations dotfiles avec style ! 🚀
 
+## 📍 Structure par défaut
+
+Configz utilise par défaut le répertoire `~/.config/configz/modules/` pour stocker vos modules de configuration. Ce répertoire est personnel et n'est pas versionné avec le CLI.
+
+```
+~/.config/configz/
+├── modules/                   # Vos modules de configuration
+│   ├── fish/                  # Configuration Fish shell
+│   ├── nvim/                  # Configuration Neovim
+│   └── starship/              # Configuration Starship
+├── backups/                   # Sauvegardes automatiques
+└── config.toml               # Configuration globale
+```
+
 ## 🎯 Installation
 
 ### Installation Automatique
@@ -16,11 +30,15 @@ Un CLI moderne et modulaire pour gérer tes configurations dotfiles avec style !
 sudo ./install-cli.sh --system
 ```
 
-### Vérification
+### Première utilisation
 
 ```bash
+# Créer le répertoire des modules (première fois)
+mkdir -p ~/.config/configz/modules
+
+# Vérifier l'installation
 configz --version
-configz --help
+configz list
 ```
 
 ## 🎮 Commandes Principales
@@ -43,11 +61,17 @@ configz list --json
 
 **Sortie exemple :**
 ```
+Configz Modules
+Source: /Users/user/.config/configz/modules
+Target: /Users/user/.config
+
 ST  ICON NAME                 DESCRIPTION
 --- ---- -------------------- --------------------
 ✓   🐟   Fish Shell          Shell interactif moderne
 ○   👻   Ghostty Terminal    Terminal haute performance
 ✓   ⭐   Starship Prompt     Prompt cross-shell rapide
+
+Total: 3 modules
 ```
 
 ### 🔧 Installer des modules
@@ -160,6 +184,7 @@ configz restore fish
 | `--no-backup` | Pas de backup automatique |
 | `-f, --force` | Forcer sans confirmation |
 | `--config-dir DIR` | Répertoire config personnalisé |
+| `--modules-dir DIR` | Répertoire modules personnalisé |
 
 ## 🧩 Créer tes propres modules
 
@@ -260,10 +285,13 @@ configz status --json | jq '.summary.installed'
 
 ```bash
 # Environnement de développement
-configz --config-dir ~/dev-configs install fish nvim
+configz --modules-dir ~/dev-configs --config-dir ~/dev-dotfiles install fish nvim
 
 # Configuration serveur
-configz --config-dir ~/server-configs install starship
+configz --modules-dir ~/server-configs install starship
+
+# Utiliser un répertoire de modules personnalisé
+configz --modules-dir ~/my-dotfiles list
 ```
 
 ## 🐟 Auto-complétion

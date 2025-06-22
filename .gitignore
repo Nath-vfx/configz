@@ -1,4 +1,4 @@
-# Configz - Git Ignore File
+# Configz CLI - Git Ignore File
 
 # =============================================================================
 # SYSTEM FILES
@@ -10,8 +10,6 @@
 ._*
 .Spotlight-V100
 .Trashes
-ehthumbs.db
-Thumbs.db
 
 # Windows
 Thumbs.db
@@ -53,17 +51,13 @@ tramp
 *.sublime-project
 *.sublime-workspace
 
-# Atom
-.atom/
+# JetBrains IDEs
+.idea/
+*.iml
 
 # =============================================================================
-# BACKUP FILES
+# DEVELOPMENT FILES
 # =============================================================================
-
-# Configuration backups (created by our scripts)
-*.backup.*
-*.bak
-*.orig
 
 # Temporary files
 *.tmp
@@ -71,100 +65,70 @@ tramp
 .tmp/
 .temp/
 
-# =============================================================================
-# DEVELOPMENT FILES
-# =============================================================================
-
-# Node.js (if we add any)
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Python (if we add any)
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# =============================================================================
-# RUNTIME FILES
-# =============================================================================
+# Backup files
+*.backup
+*.bak
+*.orig
 
 # Log files
 *.log
 logs/
-*.log.*
-
-# Runtime data
-pids/
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
-
-# =============================================================================
-# CUSTOM IGNORES
-# =============================================================================
-
-# Local development files
-.local/
-local/
-private/
 
 # Test files
 test/
 tests/
 *.test
-*.spec
+
+# =============================================================================
+# BUILD AND RELEASE FILES
+# =============================================================================
+
+# Build artifacts
+build/
+dist/
+*.tar.gz
+*.zip
+*.sha256
+
+# Release files
+release-*/
+releases/
+
+# =============================================================================
+# LOCAL DEVELOPMENT
+# =============================================================================
+
+# Local configuration
+.env
+.env.local
+
+# Development directories
+.local/
+local/
+private/
+dev/
 
 # Documentation builds
 docs/_build/
 site/
 
-# IDE configurations
-.idea/
-*.iml
-
-# Environment files
-.env
-.env.local
-.env.*.local
-
 # =============================================================================
-# EXCEPTIONS (files to keep)
+# RUNTIME FILES
 # =============================================================================
 
-# Keep important dotfiles
+# PID files
+*.pid
+pids/
+
+# Cache directories
+cache/
+.cache/
+
+# =============================================================================
+# IMPORTANT EXCEPTIONS
+# =============================================================================
+
+# Always keep these files
 !.gitignore
-!.gitkeep
-
-# Keep all config files in the config/ directory
-!config/
-!config/**
-
-# Keep all library files
-!lib/
-!lib/**
-
-# Keep all installation scripts
-!install/
-!install/**
+!README.md
+!LICENSE

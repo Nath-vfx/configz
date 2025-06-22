@@ -114,6 +114,7 @@ GLOBAL OPTIONS:
         --no-backup        Skip automatic backups
     -f, --force            Force operations without confirmation
         --config-dir DIR   Use custom config directory (default: ~/.config)
+        --modules-dir DIR  Use custom modules directory (default: ~/.config/configz/modules)
 
 EXAMPLES:
     $PROGRAM_NAME list                    # List all available modules
@@ -123,6 +124,7 @@ EXAMPLES:
     $PROGRAM_NAME backup fish             # Backup fish configuration
     $PROGRAM_NAME info nvim               # Show nvim module details
     $PROGRAM_NAME doctor                  # Check system health
+    $PROGRAM_NAME --modules-dir ~/my-configs list  # Use custom modules directory
 
 For more information about a specific command, use:
     $PROGRAM_NAME <COMMAND> --help
@@ -256,6 +258,19 @@ parse_global_options() {
                 TARGET_BASE_DIR="${1#*=}"
                 shift
                 ;;
+            --modules-dir)
+                if [[ -n "${2:-}" ]]; then
+                    CONFIG_SOURCE_DIR="$2"
+                    shift 2
+                else
+                    log_error "Option --modules-dir requires a directory path"
+                    exit 1
+                fi
+                ;;
+            --modules-dir=*)
+                CONFIG_SOURCE_DIR="${1#*=}"
+                shift
+                ;;
             -*)
                 log_error "Unknown global option: $1"
                 log_info "Use '$PROGRAM_NAME --help' for available options"
@@ -284,6 +299,8 @@ main() {
             -v|--verbose|-q|--quiet|-n|--dry-run|--no-backup|-f|--force) shift ;;
             --config-dir) shift 2 ;;
             --config-dir=*) shift ;;
+            --modules-dir) shift 2 ;;
+            --modules-dir=*) shift ;;
             -*) shift ;;
             *) break ;;
         esac
