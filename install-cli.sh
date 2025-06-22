@@ -11,7 +11,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROGRAM_NAME="configz"
-VERSION="0.2.1-alpha"
+VERSION="0.2.2-alpha"
 
 # Installation paths
 if [[ "$EUID" -eq 0 ]]; then

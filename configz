@@ -17,7 +17,7 @@ CONFIG_SOURCE_DIR="$HOME/.config/configz/modules"
 TARGET_BASE_DIR="$HOME/.config"
 
 # Version and metadata
-VERSION="0.2.1-alpha"
+VERSION="0.2.2-alpha"
 PROGRAM_NAME="configz"
 
 # Default options

@@ -1,5 +1,7 @@
 # Configz - Modern Configuration Management CLI
 
+**Version : 0.2.2-alpha**
+
 A modern, modular configuration management system for your dotfiles and application configurations.
 
 ## 🚀 Quick Start
@@ -15,6 +17,7 @@ cd configz
 ./install-cli.sh
 
 # Start using it
+configz --version   # ➜ doit afficher 0.2.2-alpha
 configz list
 ```
 

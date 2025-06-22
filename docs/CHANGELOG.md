@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2-alpha] - 2025-06-22
+
+### Added
+- **Option `--modules-dir`**: Personnalisation du chemin des modules
+- **Nouvelle structure de documentation**: guides utilisateur et développeur, exemples, guides avancés (3000+ lignes)
+- **README**: Mise à jour pour la version 0.2.2-alpha et la nouvelle structure
+- **Support complet du dossier `~/.config/configz/modules`** (par défaut, plus de dossier config/ dans le repo)
+- **Compatibilité ascendante**: Migration automatique possible via `--modules-dir`
+- **.gitignore**: Nettoyage et simplification
+
+### Changed
+- **Suppression de tous les exemples/configs du repo**: Les modules sont désormais personnels et hors repo
+- **Documentation**: Tout est rangé dans `docs/` avec navigation claire
+- **README**: Ajout de la version, instructions de migration, liens vers la doc
+- **Installateur**: Seul `install-cli.sh` reste, suppression de l'ancien installateur interactif
+
+### Removed
+- **Dossiers et fichiers obsolètes**: config/, config-examples/, release-*, scripts de dev, anciens guides, artéfacts de build
+- **Références à l'ancien système de modules dans le repo**
+
+### Fixed
+- **Aucune régression**: Toutes les commandes principales testées et validées
+- **Compatibilité**: Les modules existants sont préservés lors de la migration
+
 ## [0.2.1-alpha] - 2024-12-21
 
 ### Added
