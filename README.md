@@ -17,7 +17,7 @@ cd configz
 ./install-cli.sh
 
 # Start using it
-configz --version   # ➜ doit afficher 0.2.2-alpha
+configz --version   # -> must show 0.2.2-alpha
 configz list
 ```
 
