@@ -1,5 +1,19 @@
 #!/usr/bin/env bash
 
+# Check for minimum Bash version 4.0
+if [[ -n "${BASH_VERSION:-}" ]]; then
+    bash_major="${BASH_VERSION%%.*}"
+    if (( bash_major < 4 )); then
+        echo -e "\033[0;31m[ERROR]\033[0m Bash version 4 or higher is required. Your version: $BASH_VERSION"
+        echo "Please upgrade Bash (e.g., via Homebrew: brew install bash) and re-run this installer."
+        exit 1
+    fi
+else
+    echo -e "\033[0;31m[ERROR]\033[0m This installer must be run with Bash."
+    exit 1
+fi
+
+
 # Configz CLI Global Installation Script
 # Installs configz CLI system-wide for easy access
 
