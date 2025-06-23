@@ -233,7 +233,7 @@ configz migrate ~/old-dotfiles         # Migrate existing configs
 
 ```bash
 # Clone and setup
-git clone https://github.com/yourusername/configz.git
+git clone https://github.com/Nath-vfx/configz.git
 cd configz
 
 # Test locally (without installing)
