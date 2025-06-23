@@ -10,7 +10,7 @@ A modern, modular configuration management system for your dotfiles and applicat
 
 ```bash
 # Clone the repository
-https://github.com/Nath-vfx/configz.git
+git clone https://github.com/Nath-vfx/configz.git
 cd configz
 
 # Install the CLI globally
