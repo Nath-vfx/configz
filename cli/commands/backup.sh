@@ -99,11 +99,24 @@ backup_main() {
     # Determine modules to backup
     if [[ $backup_all == true ]]; then
         log_info "Finding all installed modules..."
+        # Backup all installed modules
+        echo -e "${BOLD}Backing up all installed modules:${NC}"
+        # Perform backup
+        local successful=0
+        local failed=0
         while IFS= read -r module; do
             if is_module_installed "$module"; then
-                modules+=("$module")
+                local name icon
+                name=$(get_module_name "$module")
+                icon=$(get_module_icon "$module")
+                echo "  $icon $name"
+                if backup_single_module "$module"; then
+                    ((successful++))
+                else
+                    ((failed++))
+                fi
             fi
-        done < <(get_available_modules)
+        done < <(get_available_modules "false")
     fi
 
     # Check if modules specified

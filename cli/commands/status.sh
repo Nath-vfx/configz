@@ -106,7 +106,7 @@ show_status_table() {
     local modules=("${@:4}")
 
     if [[ ${#modules[@]} -eq 0 ]]; then
-        readarray -t modules < <(get_available_modules)
+        readarray -t modules < <(get_available_modules "false")
     fi
 
     if [[ ${#modules[@]} -eq 0 ]]; then
@@ -233,7 +233,7 @@ show_status_json() {
     local modules=("${@:3}")
 
     if [[ ${#modules[@]} -eq 0 ]]; then
-        readarray -t modules < <(get_available_modules)
+        readarray -t modules < <(get_available_modules "false")
     fi
 
     echo "{"

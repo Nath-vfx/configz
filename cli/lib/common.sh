@@ -9,6 +9,7 @@
 
 # Get all available modules
 get_available_modules() {
+    local include_hidden="${1:-false}"
     local modules=()
 
     if [[ ! -d "$CONFIG_SOURCE_DIR" ]]; then
@@ -18,8 +19,37 @@ get_available_modules() {
     while IFS= read -r -d '' dir; do
         local module_name
         module_name=$(basename "$dir")
+        
+        # Skip hidden directories unless explicitly requested
+        if [[ "$module_name" =~ ^\..*$ ]] && [[ "$include_hidden" != "true" ]]; then
+            continue
+        fi
+        
+        # Skip if directory is empty (no files or subdirectories)
+        if [[ -z "$(find "$dir" -mindepth 1 -maxdepth 1 2>/dev/null)" ]]; then
+            continue
+        fi
+        
+        # Skip if directory contains only hidden files/directories and include_hidden is false
+        if [[ "$include_hidden" != "true" ]]; then
+            local has_visible_content=false
+            while IFS= read -r -d '' item; do
+                local item_name
+                item_name=$(basename "$item")
+                if [[ ! "$item_name" =~ ^\..*$ ]]; then
+                    has_visible_content=true
+                    break
+                fi
+            done < <(find "$dir" -mindepth 1 -maxdepth 1 -print0 2>/dev/null)
+            
+            if [[ "$has_visible_content" != "true" ]]; then
+                continue
+            fi
+        fi
+        
         modules+=("$module_name")
-    done < <(find "$CONFIG_SOURCE_DIR" -mindepth 1 -maxdepth 1 -type d -print0)
+    done < <(find "$CONFIG_SOURCE_DIR" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
+    
     printf '%s\n' "${modules[@]}" | sort
 }
 
@@ -64,7 +94,8 @@ is_module_installed() {
     set +e
     target_path=$(get_module_target_path "$module")
     local result=0
-    [[ -d "$target_path" ]] || result=1
+    # Check if target exists (directory or symlink)
+    [[ -d "$target_path" || -L "$target_path" ]] || result=1
     set -e
     return $result
 }
@@ -178,51 +209,75 @@ install_module_files() {
     local target_path
     target_path=$(get_module_target_path "$module")
 
-
-
     # Create backup if target exists and backup is enabled
     if [[ $NO_BACKUP -eq 0 ]] && [[ -e "$target_path" ]]; then
         create_backup "$target_path"
     fi
 
-    # Create target directory
-    if [[ $DRY_RUN -eq 1 ]]; then
-        log_info "Would create directory: $target_path"
-    else
-        mkdir -p "$target_path"
-    fi
-
-    # Copy files (excluding configz.toml)
-    local files_copied=0
-    while IFS= read -r -d '' file; do
-        local relative_path="${file#$source_path/}"
-
-        # Skip configz.toml
-        if [[ "$relative_path" == "configz.toml" ]]; then
-            continue
-        fi
-
-        local target_file="$target_path/$relative_path"
-        local target_dir
-        target_dir=$(dirname "$target_file")
-
+    # Remove existing target if it exists
+    if [[ -e "$target_path" || -L "$target_path" ]]; then
         if [[ $DRY_RUN -eq 1 ]]; then
-            log_info "Would copy: $relative_path"
+            log_info "Would remove existing: $target_path"
         else
-            mkdir -p "$target_dir"
-            cp -r "$file" "$target_file"
-            log_debug "Copied: $relative_path"
+            rm -rf "$target_path"
         fi
-
-        ((files_copied++))
-    done < <(find "$source_path" -type f -print0)
-
-    if [[ $files_copied -eq 0 ]]; then
-        log_warning "No files found to install in module '$module'"
-        return 1
     fi
 
-    log_success "Installed module '$module' ($files_copied files)"
+    if [[ $NO_SYMLINK -eq 1 ]]; then
+        # Legacy mode: copy files to target directory
+        if [[ $DRY_RUN -eq 1 ]]; then
+            log_info "Would create directory: $target_path"
+        else
+            mkdir -p "$target_path"
+        fi
+
+        # Copy files (excluding configz.toml)
+        local files_copied=0
+        while IFS= read -r -d '' file; do
+            local relative_path="${file#$source_path/}"
+
+            # Skip configz.toml
+            if [[ "$relative_path" == "configz.toml" ]]; then
+                continue
+            fi
+
+            local target_file="$target_path/$relative_path"
+            local target_dir
+            target_dir=$(dirname "$target_file")
+
+            if [[ $DRY_RUN -eq 1 ]]; then
+                log_info "Would copy: $relative_path"
+            else
+                mkdir -p "$target_dir"
+                cp -r "$file" "$target_file"
+                log_debug "Copied: $relative_path"
+            fi
+
+            ((files_copied++))
+        done < <(find "$source_path" -type f -print0)
+
+        if [[ $files_copied -eq 0 ]]; then
+            log_warning "No files found to install in module '$module'"
+            return 1
+        fi
+
+        log_success "Installed module '$module' ($files_copied files copied)"
+    else
+        # New default mode: create symlink to module directory
+        if [[ $DRY_RUN -eq 1 ]]; then
+            log_info "Would create symlink: $target_path -> $source_path"
+        else
+            # Ensure parent directory exists
+            mkdir -p "$(dirname "$target_path")"
+            
+            # Create symlink
+            ln -sf "$source_path" "$target_path"
+            log_debug "Created symlink: $target_path -> $source_path"
+        fi
+
+        log_success "Installed module '$module' (symlinked)"
+    fi
+
     return 0
 }
 
@@ -232,21 +287,50 @@ remove_module_files() {
     local target_path
     target_path=$(get_module_target_path "$module")
 
-    if [[ ! -e "$target_path" ]]; then
+    if [[ ! -e "$target_path" && ! -L "$target_path" ]]; then
         log_warning "Module '$module' is not installed"
         return 1
     fi
 
-    # Create backup before removal
-    if [[ $NO_BACKUP -eq 0 ]]; then
-        create_backup "$target_path"
-    fi
+    # Check if it's a symlink or a copied directory
+    if [[ -L "$target_path" ]]; then
+        log_info "Removing symlinked module: $module"
+        
+        # Create backup before removal (backup the symlink itself)
+        if [[ $NO_BACKUP -eq 0 ]]; then
+            local timestamp
+            timestamp=$(date +"%Y%m%d_%H%M%S")
+            local backup_path="${target_path}.symlink_backup.${timestamp}"
+            
+            if [[ $DRY_RUN -eq 1 ]]; then
+                log_info "Would backup symlink: $target_path -> $backup_path"
+            else
+                cp -P "$target_path" "$backup_path"
+                log_info "Backup created: $backup_path"
+            fi
+        fi
 
-    if [[ $DRY_RUN -eq 1 ]]; then
-        log_info "Would remove: $target_path"
+        # Remove the symlink
+        if [[ $DRY_RUN -eq 1 ]]; then
+            log_info "Would remove symlink: $target_path"
+        else
+            rm "$target_path"
+            log_success "Removed symlink: $target_path"
+        fi
     else
-        rm -rf "$target_path"
-        log_success "Removed module '$module'"
+        log_info "Removing copied module: $module"
+        
+        # Create backup before removal
+        if [[ $NO_BACKUP -eq 0 ]]; then
+            create_backup "$target_path"
+        fi
+
+        if [[ $DRY_RUN -eq 1 ]]; then
+            log_info "Would remove directory: $target_path"
+        else
+            rm -rf "$target_path"
+            log_success "Removed directory: $target_path"
+        fi
     fi
 
     return 0
@@ -326,17 +410,41 @@ check_module_dependencies() {
 # FORMATTING AND DISPLAY
 # =============================================================================
 
+# Get module installation type
+get_module_installation_type() {
+    local module="$1"
+    local target_path
+    target_path=$(get_module_target_path "$module")
+
+    if [[ ! -e "$target_path" && ! -L "$target_path" ]]; then
+        echo "not_installed"
+        return 1
+    fi
+
+    if [[ -L "$target_path" ]]; then
+        echo "symlink"
+    else
+        echo "copy"
+    fi
+}
+
 # Format module status for display
 format_module_status() {
     local module="$1"
-    local name icon status_icon status_text
+    local name icon status_icon status_text installation_type
 
     name=$(get_module_name "$module")
     icon=$(get_module_icon "$module")
 
     if is_module_installed "$module"; then
-        status_icon="${GREEN}✓${NC}"
-        status_text="${GREEN}installed${NC}"
+        installation_type=$(get_module_installation_type "$module")
+        if [[ "$installation_type" == "symlink" ]]; then
+            status_icon="${GREEN}🔗${NC}"
+            status_text="${GREEN}installed (symlink)${NC}"
+        else
+            status_icon="${GREEN}📁${NC}"
+            status_text="${GREEN}installed (copy)${NC}"
+        fi
     else
         status_icon="${DIM}○${NC}"
         status_text="${DIM}not installed${NC}"
@@ -597,7 +705,7 @@ EOF
     if [[ ! -f "$registry_file" ]]; then
         cat > "$registry_file" << 'EOF'
 {
-  "version": "0.2.0-alpha",
+  "version": "0.3.0-alpha",
   "installed_modules": {},
   "last_updated": "",
   "migration_completed": false

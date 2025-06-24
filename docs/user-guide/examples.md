@@ -1000,11 +1000,11 @@ Create modules that work differently on different systems by using environment c
 # Keep modules in version control
 cd ~/.config/configz/modules
 git init
-git remote add origin https://github.com/yourusername/my-dotfiles
+git remote add origin https://github.com/your-username/my-dotfiles
 git push -u origin main
 
 # On new machine
-git clone https://github.com/yourusername/my-dotfiles ~/.config/configz/modules
+git clone https://github.com/your-username/my-dotfiles ~/.config/configz/modules
 configz install --all
 ```
 

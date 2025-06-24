@@ -16,11 +16,11 @@ Thank you for your interest in contributing to Configz! This guide will help you
 ```bash
 # Fork the repository on GitHub
 # Clone your fork
-git clone https://github.com/yourusername/configz.git
+git clone https://github.com/Nath-vfx/configz.git
 cd configz
 
 # Set up upstream remote
-git remote add upstream https://github.com/original/configz.git
+git remote add upstream https://github.com/Nath-vfx/configz.git
 
 # Create development branch
 git checkout -b feature/your-feature-name
