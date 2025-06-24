@@ -76,6 +76,130 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Check system dependencies
+check_dependencies() {
+    log_info "Checking system dependencies..."
+    
+    local missing_deps=()
+    local optional_deps=()
+    
+    # Essential dependencies (required for basic functionality)
+    local required_deps=(
+        "find"      # Module discovery
+        "cp"        # File copying
+        "ln"        # Symlink creation
+        "rm"        # File removal
+        "mkdir"     # Directory creation
+        "date"      # Timestamps
+        "grep"      # Text processing
+        "sed"       # Text processing
+        "cut"       # Text processing
+        "sort"      # Text sorting
+        "basename"  # Path manipulation
+        "dirname"   # Path manipulation
+        "yq"        # TOML/YAML parsing (REQUIRED for configz.toml)
+    )
+    
+    # Optional dependencies (enhance functionality)
+    local optional_tools=(
+        "jq"        # JSON processing (recommended)"
+        "git"       # Version control (optional)"
+    )
+    
+    echo
+    echo -e "${BOLD}Required Dependencies:${NC}"
+    
+    for cmd in "${required_deps[@]}"; do
+        if command_exists "$cmd"; then
+            echo -e "  ${GREEN}✓${NC} $cmd"
+        else
+            echo -e "  ${RED}✗${NC} $cmd ${RED}(MISSING)${NC}"
+            missing_deps+=("$cmd")
+        fi
+    done
+    
+    echo
+    echo -e "${BOLD}Optional Dependencies:${NC}"
+    
+    for tool_info in "${optional_tools[@]}"; do
+        local tool="${tool_info%% *}"
+        local description="${tool_info#* }"
+        
+        if command_exists "$tool"; then
+            echo -e "  ${GREEN}✓${NC} $tool - $description"
+        else
+            echo -e "  ${YELLOW}○${NC} $tool - $description ${YELLOW}(recommended)${NC}"
+            optional_deps+=("$tool")
+        fi
+    done
+    
+    echo
+    
+    # Handle missing required dependencies
+    if [[ ${#missing_deps[@]} -gt 0 ]]; then
+        log_error "Missing required dependencies: ${missing_deps[*]}"
+        echo
+        echo -e "${BOLD}Installation instructions:${NC}"
+        
+                 for dep in "${missing_deps[@]}"; do
+             case "$dep" in
+                 "yq")
+                     echo -e "  ${CYAN}yq:${NC} brew install yq  ${DIM}# REQUIRED for configz.toml parsing${NC}"
+                     echo -e "       ${DIM}Alternative: download from https://github.com/mikefarah/yq${NC}"
+                     ;;
+                 "jq")
+                     echo -e "  ${CYAN}jq:${NC} brew install jq  ${DIM}# or apt install jq / yum install jq${NC}"
+                     ;;
+                 "git")
+                     echo -e "  ${CYAN}git:${NC} brew install git  ${DIM}# or apt install git / yum install git${NC}"
+                     ;;
+                 *)
+                     echo -e "  ${CYAN}$dep:${NC} Usually available in coreutils package"
+                     ;;
+             esac
+         done
+        
+        echo
+        log_error "Please install missing dependencies before proceeding"
+        return 1
+    fi
+    
+    # Warn about missing optional dependencies
+    if [[ ${#optional_deps[@]} -gt 0 ]]; then
+        log_warning "Some optional dependencies are missing: ${optional_deps[*]}"
+        echo
+        echo -e "${BOLD}Why these dependencies are recommended:${NC}"
+        
+        for dep in "${optional_deps[@]}"; do
+            case "$dep" in
+                "yq")
+                    echo -e "  ${CYAN}yq:${NC} Enables advanced module configuration via configz.toml files"
+                    echo -e "       ${DIM}Without yq: Basic functionality only, no custom targets or metadata${NC}"
+                    ;;
+                "jq")
+                    echo -e "  ${CYAN}jq:${NC} Improves JSON output formatting and processing"
+                    echo -e "       ${DIM}Without jq: JSON output may be less formatted${NC}"
+                    ;;
+                "git")
+                    echo -e "  ${CYAN}git:${NC} Required for version control features and some module operations"
+                    echo -e "       ${DIM}Without git: Limited module management capabilities${NC}"
+                    ;;
+            esac
+        done
+        
+        echo
+        echo -e "${YELLOW}Continue installation anyway? [y/N]${NC}"
+        read -r response
+        if [[ ! "$response" =~ ^[Yy]([Ee][Ss])?$ ]]; then
+            log_info "Installation cancelled. Install recommended dependencies and try again."
+            return 1
+        fi
+    fi
+    
+    log_success "Dependency check completed"
+    return 0
+}
+
 # =============================================================================
 # INSTALLATION FUNCTIONS
 # =============================================================================
@@ -453,6 +577,7 @@ OPTIONS:
     --uninstall     Uninstall configz
     --user          Force user installation (default for non-root)
     --system        Force system installation (requires root)
+    --skip-deps     Skip dependency checking (not recommended)
 
 DESCRIPTION:
     Installs configz CLI globally for easy access from anywhere.
@@ -493,6 +618,7 @@ main() {
     local uninstall_mode=0
     local force_user=0
     local force_system=0
+    local skip_deps=0
 
     # Parse arguments
     while [[ $# -gt 0 ]]; do
@@ -511,6 +637,10 @@ main() {
                 ;;
             --system)
                 force_system=1
+                shift
+                ;;
+            --skip-deps)
+                skip_deps=1
                 shift
                 ;;
             *)
@@ -550,6 +680,20 @@ main() {
 
     log_info "Installation type: $([ "$EUID" -eq 0 ] && echo "system-wide" || echo "user")"
     log_info "Install directory: $INSTALL_DIR"
+    echo
+
+    # Check system dependencies before installation
+    if [[ $skip_deps -eq 0 ]]; then
+        if ! check_dependencies; then
+            log_error "Dependency check failed. Installation aborted."
+            exit 1
+        fi
+        echo
+    else
+        log_warning "Skipping dependency check (--skip-deps flag used)"
+        log_warning "configz may not work correctly without required dependencies"
+        echo
+    fi
 
     # Run installation steps
     create_directories || exit 1
