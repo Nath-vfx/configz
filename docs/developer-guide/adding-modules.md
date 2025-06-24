@@ -380,7 +380,7 @@ git add .
 git commit -m "Initial modules setup"
 
 # Consider using a separate repository for modules
-git clone https://github.com/yourusername/my-dotfiles.git ~/.config/configz/modules
+git clone https://github.com/your-username/my-dotfiles.git ~/.config/configz/modules
 ```
 
 ## 🔄 Module Templates
@@ -503,7 +503,7 @@ commands = ["git", "curl"] # Only if commands are available
 
 ## 🎉 Examples Repository
 
-Check out the [Configz Examples Repository](https://github.com/configz/examples) for:
+Check out the [Configz Repository](https://github.com/Nath-vfx/configz) for:
 - Real-world module examples
 - Popular application configurations
 - Community-contributed modules
@@ -525,4 +525,4 @@ Check out the [Configz Examples Repository](https://github.com/configz/examples)
 For more information, see:
 - [CLI Guide](CLI_GUIDE.md) - Complete CLI documentation
 - [README](README.md) - Getting started guide
-- [Examples](https://github.com/configz/examples) - Real-world examples
+- [Documentation](https://github.com/Nath-vfx/configz/tree/main/docs) - Real-world examples

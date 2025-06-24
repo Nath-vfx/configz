@@ -398,4 +398,4 @@ configz backup --all
 
 ---
 
-**Configz CLI v0.2.1-alpha** - Fait avec ❤️ pour les développeurs qui aiment les configs propres !
+**Configz CLI v0.3.0-alpha** - Fait avec ❤️ pour les développeurs qui aiment les configs propres !

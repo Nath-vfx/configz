@@ -5,7 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.3.0-alpha] - 2025-01-21
+
+### ✨ Major Features Added
+
+#### Symlinks by Default with --no-symlink Flag
+- **Symlinks as default**: Modules are now installed as symlinks by default for real-time configuration updates
+- **--no-symlink flag**: Added option to use legacy copy mode when needed
+- **Intelligent removal**: Automatic detection and proper handling of both symlinked and copied modules
+- **Installation type display**: Status command now shows 🔗 for symlinks and 📁 for copied directories
+
+#### Hidden Directory Filtering with --show-hidden Flag
+- **Hidden directories filtered**: Directories starting with `.` are hidden by default for security
+- **--show-hidden flag**: Added option to show hidden directories with security warnings
+- **Directory-only discovery**: Enhanced module discovery to only process directories (never files)
+- **Empty directory filtering**: Directories without content are automatically filtered out
+
+#### Hidden Module Installation Protection with --install-hidden Flag
+- **Hidden module protection**: Installation of hidden modules requires explicit `--install-hidden` flag
+- **Double confirmation**: Hidden module installation requires user confirmation with typed phrase
+- **Security warnings**: Clear warnings about risks of installing hidden configurations
+- **Selective installation**: `configz install --all` excludes hidden modules by default
+
+#### Dependency Checking in Installation Script
+- **Pre-installation checks**: install-cli.sh now verifies all required dependencies before installation
+- **Required dependencies**: Essential tools (find, cp, ln, etc.) must be present
+- **YQ as required**: yq is now a required dependency (moved from optional) for configz.toml parsing
+- **Optional dependencies**: jq and git remain optional with clear explanations of their benefits
+- **Skip option**: --skip-deps flag allows bypassing checks in emergency situations
+
+### 🔧 Enhanced
+- **Fish autocompletion**: Updated with all new flags and options
+- **Error messages**: Improved clarity and helpfulness of error messages
+- **User experience**: Better guidance for security-sensitive operations
+- **Installation robustness**: More reliable installation process with dependency validation
+
+### 🔒 Security
+- **Hidden content protection**: Multiple layers of protection against accidental installation of sensitive configurations
+- **User awareness**: Clear warnings and confirmations for potentially dangerous operations
+- **Selective visibility**: Hidden directories and modules require explicit user action to access
 
 ## [0.2.2-alpha] - 2025-06-22
 
@@ -139,10 +177,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
-- **0.2.0-alpha**: Modern CLI interface (current)
+- **0.3.0-alpha**: Modern CLI interface (current)
+- **0.2.0-alpha**: Modern CLI interface (previous)
 - **0.1.0**: Interactive installation system (stable)
 
 ## Migration Notes
+
+### From 0.2.x to 0.3.0-alpha
+
+Version 0.3.0-alpha introduces major security and usability improvements:
+- Symlinks are now the default installation method
+- Hidden directories are filtered by default for security
+- Enhanced dependency checking in installation script
+- yq is now a required dependency
 
 ### From 0.1.0 to 0.2.0-alpha
 

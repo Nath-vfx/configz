@@ -82,7 +82,7 @@ Configz is a modern, modular configuration management system that helps you:
 
 ## 🔗 External Resources
 
-- **GitHub Repository**: [https://github.com/Nath-vfx/configz](https://github.com/yourusername/configz)
+- **GitHub Repository**: [https://github.com/Nath-vfx/configz](https://github.com/Nath-vfx/configz)
 
 ---
 

@@ -14,7 +14,7 @@ Welcome to Configz! This guide will help you get up and running with the modern 
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/configz.git
+git clone https://github.com/Nath-vfx/configz.git
 cd configz
 
 # Install the CLI globally

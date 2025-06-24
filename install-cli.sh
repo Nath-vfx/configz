@@ -25,7 +25,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROGRAM_NAME="configz"
-VERSION="0.2.2-alpha"
+VERSION="0.3.0-alpha"
 
 # Installation paths
 if [[ "$EUID" -eq 0 ]]; then
@@ -266,7 +266,7 @@ install_man_page() {
     local man_file="$MAN_DIR/configz.1"
 
     cat > "$man_file" << 'EOF'
-.TH CONFIGZ 1 "2024" "configz 0.2.1-alpha" "User Commands"
+.TH CONFIGZ 1 "2025" "configz 0.3.0-alpha" "User Commands"
 .SH NAME
 configz \- Modern configuration management CLI
 .SH SYNOPSIS
