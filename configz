@@ -26,6 +26,7 @@ DRY_RUN=0
 NO_BACKUP=0
 FORCE=0
 QUIET=0
+NO_SYMLINK=0
 
 # =============================================================================
 # COLORS AND UTILITIES
@@ -112,6 +113,7 @@ GLOBAL OPTIONS:
     -q, --quiet            Suppress non-error output
     -n, --dry-run          Show what would be done without executing
         --no-backup        Skip automatic backups
+        --no-symlink       Use copy/move instead of symlinks
     -f, --force            Force operations without confirmation
         --config-dir DIR   Use custom config directory (default: ~/.config)
         --modules-dir DIR  Use custom modules directory (default: ~/.config/configz/modules)
@@ -206,7 +208,7 @@ validate_environment() {
 export_globals() {
     export SCRIPT_DIR CLI_DIR CONFIG_SOURCE_DIR TARGET_BASE_DIR
     export VERSION PROGRAM_NAME
-    export VERBOSE DRY_RUN NO_BACKUP FORCE QUIET
+    export VERBOSE DRY_RUN NO_BACKUP FORCE QUIET NO_SYMLINK
     export RED GREEN YELLOW BLUE CYAN MAGENTA BOLD DIM NC
 }
 
@@ -239,6 +241,10 @@ parse_global_options() {
                 ;;
             --no-backup)
                 NO_BACKUP=1
+                shift
+                ;;
+            --no-symlink)
+                NO_SYMLINK=1
                 shift
                 ;;
             -f|--force)
@@ -296,7 +302,7 @@ main() {
     while [[ $# -gt 0 ]]; do
         case $1 in
             -h|--help|-V|--version) exit 0 ;;
-            -v|--verbose|-q|--quiet|-n|--dry-run|--no-backup|-f|--force) shift ;;
+            -v|--verbose|-q|--quiet|-n|--dry-run|--no-backup|--no-symlink|-f|--force) shift ;;
             --config-dir) shift 2 ;;
             --config-dir=*) shift ;;
             --modules-dir) shift 2 ;;

@@ -31,6 +31,7 @@ complete -c configz -s v -l verbose -d "Enable verbose output"
 complete -c configz -s q -l quiet -d "Suppress non-error output"
 complete -c configz -s n -l dry-run -d "Show what would be done without executing"
 complete -c configz -l no-backup -d "Skip automatic backups"
+complete -c configz -l no-symlink -d "Use copy instead of symlinks"
 complete -c configz -s f -l force -d "Force operations without confirmation"
 complete -c configz -l config-dir -d "Use custom config directory" -r
 
@@ -53,6 +54,7 @@ complete -c configz -n '__fish_seen_subcommand_from install' -s a -l all -d "Ins
 complete -c configz -n '__fish_seen_subcommand_from install' -s i -l interactive -d "Interactive selection mode"
 complete -c configz -n '__fish_seen_subcommand_from install' -s f -l force -d "Force installation (overwrite existing)"
 complete -c configz -n '__fish_seen_subcommand_from install' -l no-backup -d "Skip automatic backups"
+complete -c configz -n '__fish_seen_subcommand_from install' -l no-symlink -d "Use copy instead of symlinks"
 complete -c configz -n '__fish_seen_subcommand_from install' -l no-deps -d "Skip dependency checks"
 complete -c configz -n '__fish_seen_subcommand_from install' -l dry-run -d "Show what would be installed without executing"
 complete -c configz -n '__fish_seen_subcommand_from install' -a '(__configz_modules)' -d "Module to install"
@@ -79,7 +81,9 @@ complete -c configz -n '__fish_seen_subcommand_from status' -a '(__configz_modul
 # remove command
 complete -c configz -n '__fish_seen_subcommand_from remove' -s h -l help -d "Show help for remove command"
 complete -c configz -n '__fish_seen_subcommand_from remove' -s f -l force -d "Force removal without confirmation"
-complete -c configz -n '__fish_seen_subcommand_from remove' -l no-backup -d "Skip automatic backups"
+complete -c configz -n '__fish_seen_subcommand_from remove' -l no-backup -d "Skip automatic backups before removal"
+complete -c configz -n '__fish_seen_subcommand_from remove' -l no-symlink -d "Assume copy mode instead of symlinks"
+complete -c configz -n '__fish_seen_subcommand_from remove' -l clean -d "Remove backup files as well"
 complete -c configz -n '__fish_seen_subcommand_from remove' -l dry-run -d "Show what would be removed without executing"
 complete -c configz -n '__fish_seen_subcommand_from remove' -a '(__configz_installed_modules)' -d "Module to remove"
 

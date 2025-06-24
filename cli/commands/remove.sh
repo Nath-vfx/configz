@@ -22,6 +22,7 @@ OPTIONS:
     -h, --help          Show this help message
     -f, --force         Force removal without confirmation
     --no-backup         Skip automatic backups before removal
+    --no-symlink        Assume copy mode instead of symlinks
     -n, --dry-run       Show what would be removed without executing
     --clean             Remove backup files as well
 
@@ -32,13 +33,17 @@ EXAMPLES:
     $PROGRAM_NAME remove fish                # Remove fish module
     $PROGRAM_NAME remove fish starship       # Remove multiple modules
     $PROGRAM_NAME remove --force fish        # Remove without confirmation
+    $PROGRAM_NAME remove --no-symlink fish   # Remove assuming copy mode
     $PROGRAM_NAME remove --dry-run fish      # Preview removal
     $PROGRAM_NAME remove --clean fish        # Remove and clean backups
 
 DESCRIPTION:
-    Removes installed configuration modules by deleting their files from
-    the target locations. Creates automatic backups by default unless
-    --no-backup is specified.
+    Removes installed configuration modules by deleting their symlinks or 
+    copied files from the target locations. Automatically detects whether 
+    modules were installed as symlinks or copies. Use --no-symlink to force
+    copy mode behavior.
+    
+    Creates automatic backups by default unless --no-backup is specified.
 
     Supports dry-run mode to preview changes before execution.
 
@@ -167,12 +172,16 @@ remove_main() {
                 NO_BACKUP=1
                 shift
                 ;;
-            --clean)
-                clean_backups=true
+            --no-symlink)
+                NO_SYMLINK=1
                 shift
                 ;;
             -n|--dry-run)
                 DRY_RUN=1
+                shift
+                ;;
+            --clean)
+                clean_backups=true
                 shift
                 ;;
             -*)

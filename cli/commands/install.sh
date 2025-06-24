@@ -24,6 +24,7 @@ OPTIONS:
     -i, --interactive   Interactive selection mode
     -f, --force         Force installation (overwrite existing)
     --no-backup         Skip automatic backups
+    --no-symlink        Use copy instead of symlinks (legacy mode)
     --no-deps           Skip dependency checks
     --dry-run           Show what would be installed without executing
 
@@ -35,11 +36,15 @@ EXAMPLES:
     $PROGRAM_NAME install fish starship        # Install specific modules
     $PROGRAM_NAME install --all                # Install all modules
     $PROGRAM_NAME install --no-backup fish     # Install without backup
+    $PROGRAM_NAME install --no-symlink fish    # Install using copy mode
     $PROGRAM_NAME install --dry-run fish       # Preview installation
 
 DESCRIPTION:
-    Installs configuration modules by copying files from the source directory
-    to their target locations. Creates automatic backups by default.
+    Installs configuration modules by creating symlinks from the source directory
+    to their target locations. This is the new default behavior that allows for
+    easy updates and management. Use --no-symlink to use the legacy copy mode.
+    
+    Creates automatic backups by default when overwriting existing configurations.
 
     If no modules are specified, enters interactive selection mode.
 
@@ -310,13 +315,25 @@ preview_installation() {
         if is_module_installed "$module"; then
             echo -e "  ${YELLOW}Status: Currently installed (would be updated)${NC}"
             if [[ $NO_BACKUP -eq 0 ]]; then
-                echo -e "  ${BLUE}Action: Backup existing + Install${NC}"
+                if [[ $NO_SYMLINK -eq 1 ]]; then
+                    echo -e "  ${BLUE}Action: Backup existing + Install (copy)${NC}"
+                else
+                    echo -e "  ${BLUE}Action: Backup existing + Install (symlink)${NC}"
+                fi
             else
-                echo -e "  ${BLUE}Action: Overwrite existing${NC}"
+                if [[ $NO_SYMLINK -eq 1 ]]; then
+                    echo -e "  ${BLUE}Action: Overwrite existing (copy)${NC}"
+                else
+                    echo -e "  ${BLUE}Action: Overwrite existing (symlink)${NC}"
+                fi
             fi
         else
             echo -e "  ${GREEN}Status: Not installed${NC}"
-            echo -e "  ${BLUE}Action: Install${NC}"
+            if [[ $NO_SYMLINK -eq 1 ]]; then
+                echo -e "  ${BLUE}Action: Install (copy)${NC}"
+            else
+                echo -e "  ${BLUE}Action: Install (symlink)${NC}"
+            fi
         fi
 
         # Show files
@@ -363,6 +380,10 @@ install_main() {
                 ;;
             --no-backup)
                 NO_BACKUP=1
+                shift
+                ;;
+            --no-symlink)
+                NO_SYMLINK=1
                 shift
                 ;;
             --no-deps)
