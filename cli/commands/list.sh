@@ -24,6 +24,7 @@ OPTIONS:
     -i, --installed   Show only installed modules
     -u, --uninstalled Show only uninstalled modules
     -l, --long        Show detailed information
+    --show-hidden     Include hidden directories (starts with .)
     --json            Output in JSON format
     --no-color        Disable colored output
 
@@ -31,6 +32,7 @@ EXAMPLES:
     $PROGRAM_NAME list                    # List all modules
     $PROGRAM_NAME list --installed        # Show only installed modules
     $PROGRAM_NAME list --long             # Show detailed information
+    $PROGRAM_NAME list --show-hidden      # Include hidden directories
     $PROGRAM_NAME list --json             # JSON output for scripting
 
 DESCRIPTION:
@@ -45,14 +47,23 @@ list_modules_table() {
     local filter="$1"  # all, installed, uninstalled
     local long_format="$2"  # 0 or 1
     local no_color="$3"  # 0 or 1
+    local show_hidden="$4"  # 0 or 1
 
     local modules
-    readarray -t modules < <(get_available_modules)
+    readarray -t modules < <(get_available_modules $([ "$show_hidden" -eq 1 ] && echo "true" || echo "false"))
 
     if [[ ${#modules[@]} -eq 0 ]]; then
         log_info "No modules found in $CONFIG_SOURCE_DIR"
         log_info "Create your first module with: $PROGRAM_NAME init <name>"
         return 0
+    fi
+
+    # Show warning for hidden directories
+    if [[ $show_hidden -eq 1 ]]; then
+        echo -e "${YELLOW}⚠️  WARNING: Showing hidden directories${NC}"
+        echo -e "${YELLOW}   Hidden directories (starting with .) are usually hidden for a reason.${NC}"
+        echo -e "${YELLOW}   Consider keeping sensitive or system configurations private.${NC}"
+        echo
     fi
 
     # Header
@@ -130,9 +141,10 @@ list_modules_table() {
 # List modules in JSON format
 list_modules_json() {
     local filter="$1"
+    local show_hidden="$2"
 
     local modules
-    readarray -t modules < <(get_available_modules)
+    readarray -t modules < <(get_available_modules $([ "$show_hidden" -eq 1 ] && echo "true" || echo "false"))
 
     echo "{"
     echo "  \"modules\": ["
@@ -197,6 +209,7 @@ list_main() {
     local long_format=0
     local json_output=0
     local no_color=0
+    local show_hidden=0
 
     # Parse command-specific options
     while [[ $# -gt 0 ]]; do
@@ -219,6 +232,10 @@ list_main() {
                 ;;
             -l|--long)
                 long_format=1
+                shift
+                ;;
+            --show-hidden)
+                show_hidden=1
                 shift
                 ;;
             --json)
@@ -260,7 +277,7 @@ list_main() {
 
     # Output format
     if [[ $json_output -eq 1 ]]; then
-        list_modules_json "$filter"
+        list_modules_json "$filter" "$show_hidden"
     else
         if [[ $QUIET -ne 1 ]]; then
             echo -e "${BOLD}${CYAN}Configz Modules${NC}"
@@ -268,6 +285,6 @@ list_main() {
             echo -e "${DIM}Target: $TARGET_BASE_DIR${NC}"
             echo
         fi
-        list_modules_table "$filter" "$long_format" "$no_color"
+        list_modules_table "$filter" "$long_format" "$no_color" "$show_hidden"
     fi
 }

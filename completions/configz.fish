@@ -55,6 +55,7 @@ complete -c configz -n '__fish_seen_subcommand_from install' -s i -l interactive
 complete -c configz -n '__fish_seen_subcommand_from install' -s f -l force -d "Force installation (overwrite existing)"
 complete -c configz -n '__fish_seen_subcommand_from install' -l no-backup -d "Skip automatic backups"
 complete -c configz -n '__fish_seen_subcommand_from install' -l no-symlink -d "Use copy instead of symlinks"
+complete -c configz -n '__fish_seen_subcommand_from install' -l install-hidden -d "Allow installation of hidden modules (DANGEROUS)"
 complete -c configz -n '__fish_seen_subcommand_from install' -l no-deps -d "Skip dependency checks"
 complete -c configz -n '__fish_seen_subcommand_from install' -l dry-run -d "Show what would be installed without executing"
 complete -c configz -n '__fish_seen_subcommand_from install' -a '(__configz_modules)' -d "Module to install"
@@ -65,6 +66,7 @@ complete -c configz -n '__fish_seen_subcommand_from list' -s a -l all -d "Show a
 complete -c configz -n '__fish_seen_subcommand_from list' -s i -l installed -d "Show only installed modules"
 complete -c configz -n '__fish_seen_subcommand_from list' -s u -l uninstalled -d "Show only uninstalled modules"
 complete -c configz -n '__fish_seen_subcommand_from list' -s l -l long -d "Show detailed information"
+complete -c configz -n '__fish_seen_subcommand_from list' -l show-hidden -d "Include hidden directories (starts with .)"
 complete -c configz -n '__fish_seen_subcommand_from list' -l json -d "Output in JSON format"
 complete -c configz -n '__fish_seen_subcommand_from list' -l no-color -d "Disable colored output"
 

@@ -499,7 +499,7 @@ info_main() {
         log_error "No module specified"
         log_info "Usage: $PROGRAM_NAME info <MODULE>"
         log_info "Available modules:"
-        get_available_modules | sed 's/^/  /'
+        get_available_modules "false" | sed 's/^/  /'
         exit 1
     fi
 

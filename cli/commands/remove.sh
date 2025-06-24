@@ -208,7 +208,7 @@ remove_main() {
                 icon=$(get_module_icon "$module")
                 echo "  $icon $name ($module)"
             fi
-        done < <(get_available_modules)
+        done < <(get_available_modules "false")
         exit 1
     fi
 

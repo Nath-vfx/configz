@@ -20,11 +20,12 @@ USAGE:
 
 OPTIONS:
     -h, --help          Show this help message
-    -a, --all           Install all available modules
+    -a, --all           Install all available modules (excludes hidden modules)
     -i, --interactive   Interactive selection mode
     -f, --force         Force installation (overwrite existing)
     --no-backup         Skip automatic backups
     --no-symlink        Use copy instead of symlinks (legacy mode)
+    --install-hidden    Allow installation of hidden modules (DANGEROUS - requires confirmation)
     --no-deps           Skip dependency checks
     --dry-run           Show what would be installed without executing
 
@@ -34,10 +35,14 @@ ARGUMENTS:
 EXAMPLES:
     $PROGRAM_NAME install                      # Interactive selection
     $PROGRAM_NAME install fish starship        # Install specific modules
-    $PROGRAM_NAME install --all                # Install all modules
+    $PROGRAM_NAME install --all                # Install all modules (excludes hidden)
     $PROGRAM_NAME install --no-backup fish     # Install without backup
     $PROGRAM_NAME install --no-symlink fish    # Install using copy mode
     $PROGRAM_NAME install --dry-run fish       # Preview installation
+    
+    # DANGEROUS OPERATIONS (hidden modules):
+    $PROGRAM_NAME install --install-hidden .git    # Install hidden module (requires confirmation)
+    $PROGRAM_NAME install --all --install-hidden   # Install ALL including hidden (VERY DANGEROUS)
 
 DESCRIPTION:
     Installs configuration modules by creating symlinks from the source directory
@@ -45,6 +50,10 @@ DESCRIPTION:
     easy updates and management. Use --no-symlink to use the legacy copy mode.
     
     Creates automatic backups by default when overwriting existing configurations.
+
+    SECURITY: Hidden modules (starting with .) are excluded by default for security.
+    Use --install-hidden flag with extreme caution as hidden configurations may
+    contain sensitive data or system-critical settings.
 
     If no modules are specified, enters interactive selection mode.
 
@@ -54,7 +63,7 @@ EOF
 # Interactive module selection
 interactive_selection() {
     local modules
-    readarray -t modules < <(get_available_modules)
+    readarray -t modules < <(get_available_modules "false")
 
     if [[ ${#modules[@]} -eq 0 ]]; then
         log_error "No modules found"
@@ -266,11 +275,46 @@ install_modules() {
 # Install all modules
 install_all_modules() {
     local modules
-    readarray -t modules < <(get_available_modules)
+    
+    # Get modules based on ALLOW_HIDDEN flag
+    if [[ ${ALLOW_HIDDEN:-0} -eq 1 ]]; then
+        readarray -t modules < <(get_available_modules "true")
+        log_warning "Including hidden modules (DANGEROUS operation requested)"
+    else
+        readarray -t modules < <(get_available_modules "false")
+        log_info "Excluding hidden modules for security (use --install-hidden to include)"
+    fi
 
     if [[ ${#modules[@]} -eq 0 ]]; then
-        log_error "No modules found to install"
+        if [[ ${ALLOW_HIDDEN:-0} -eq 1 ]]; then
+            log_error "No modules found to install (including hidden)"
+        else
+            log_error "No modules found to install"
+            log_info "Tip: Use --install-hidden to include hidden modules (DANGEROUS)"
+        fi
         return 1
+    fi
+
+    # Check for hidden modules and require confirmation
+    local hidden_modules=()
+    for module in "${modules[@]}"; do
+        if [[ "$module" =~ ^\..*$ ]]; then
+            hidden_modules+=("$module")
+        fi
+    done
+    
+    if [[ ${#hidden_modules[@]} -gt 0 ]]; then
+        if [[ ${ALLOW_HIDDEN:-0} -ne 1 ]]; then
+            log_error "Hidden modules detected but --install-hidden flag not provided"
+            log_error "Hidden modules found: ${hidden_modules[*]}"
+            log_info "Use --install-hidden flag to install hidden modules (DANGEROUS)"
+            return 1
+        fi
+        
+        # Double confirmation for hidden modules
+        if ! confirm_hidden_installation "${hidden_modules[@]}"; then
+            return 1
+        fi
     fi
 
     echo -e "${BOLD}Installing all available modules:${NC}"
@@ -278,7 +322,11 @@ install_all_modules() {
         local name icon
         name=$(get_module_name "$module")
         icon=$(get_module_icon "$module")
-        echo "  $icon $name"
+        if [[ "$module" =~ ^\..*$ ]]; then
+            echo -e "  ${RED}$icon $name (HIDDEN)${NC}"
+        else
+            echo -e "  $icon $name"
+        fi
     done
     echo
 
@@ -349,6 +397,60 @@ preview_installation() {
     done
 }
 
+# Double confirmation for hidden module installation
+confirm_hidden_installation() {
+    local modules=("$@")
+    
+    echo -e "${RED}${BOLD}⚠️  DANGER: Installing Hidden Modules ⚠️${NC}"
+    echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${YELLOW}You are about to install HIDDEN configuration modules:${NC}"
+    echo
+    
+    for module in "${modules[@]}"; do
+        if [[ "$module" =~ ^\..*$ ]]; then
+            local name icon
+            name=$(get_module_name "$module")
+            icon=$(get_module_icon "$module")
+            echo -e "  ${RED}🔥${NC} ${BOLD}$icon $name${NC} ${RED}(HIDDEN)${NC}"
+        fi
+    done
+    
+    echo
+    echo -e "${RED}${BOLD}WARNING:${NC} Hidden modules may contain:"
+    echo -e "  ${YELLOW}• Sensitive system configurations${NC}"
+    echo -e "  ${YELLOW}• Security-critical settings${NC}"
+    echo -e "  ${YELLOW}• Private or personal data${NC}"
+    echo -e "  ${YELLOW}• Configurations meant to stay private${NC}"
+    echo
+    echo -e "${RED}${BOLD}RISKS:${NC}"
+    echo -e "  ${RED}• May expose sensitive information${NC}"
+    echo -e "  ${RED}• May break system security${NC}"
+    echo -e "  ${RED}• May cause unintended side effects${NC}"
+    echo
+    echo -e "${BOLD}This operation is performed AT YOUR OWN RISK!${NC}"
+    echo
+    
+    # First confirmation
+    if ! confirm "${RED}Do you REALLY want to install these HIDDEN modules?${NC}"; then
+        log_info "Installation cancelled for security"
+        return 1
+    fi
+    
+    echo
+    echo -e "${RED}${BOLD}FINAL WARNING:${NC} You are installing HIDDEN modules!"
+    
+    # Second confirmation with typed confirmation
+    read -p "Type 'INSTALL HIDDEN MODULES' to confirm (case sensitive): " confirmation
+    if [[ "$confirmation" != "INSTALL HIDDEN MODULES" ]]; then
+        log_error "Confirmation failed. Installation cancelled for security."
+        return 1
+    fi
+    
+    echo
+    log_warning "Proceeding with hidden module installation at user's own risk..."
+    return 0
+}
+
 # =============================================================================
 # MAIN COMMAND FUNCTION
 # =============================================================================
@@ -358,6 +460,7 @@ install_main() {
     local install_all=0
     local interactive=0
     local skip_deps=0
+    local allow_hidden=0
 
     # Parse command-specific options
     while [[ $# -gt 0 ]]; do
@@ -386,6 +489,10 @@ install_main() {
                 NO_SYMLINK=1
                 shift
                 ;;
+            --install-hidden)
+                allow_hidden=1
+                shift
+                ;;
             --no-deps)
                 skip_deps=1
                 shift
@@ -406,8 +513,9 @@ install_main() {
         esac
     done
 
-    # Export skip_deps for use in functions
+    # Export variables for use in functions
     SKIP_DEPS=$skip_deps
+    ALLOW_HIDDEN=$allow_hidden
 
     # Ensure yq for advanced features
     ensure_yq >/dev/null 2>&1
@@ -415,7 +523,12 @@ install_main() {
     # Determine installation mode
     if [[ $install_all -eq 1 ]]; then
         if [[ $DRY_RUN -eq 1 ]]; then
-            readarray -t all_modules < <(get_available_modules)
+            local all_modules
+            if [[ $allow_hidden -eq 1 ]]; then
+                readarray -t all_modules < <(get_available_modules "true")
+            else
+                readarray -t all_modules < <(get_available_modules "false")
+            fi
             preview_installation "${all_modules[@]}"
         else
             install_all_modules
@@ -423,17 +536,46 @@ install_main() {
     elif [[ ${#modules[@]} -gt 0 ]]; then
         # Validate modules exist
         local invalid_modules=()
+        local hidden_modules=()
+        
         for module in "${modules[@]}"; do
             if ! module_exists "$module"; then
                 invalid_modules+=("$module")
+            elif [[ "$module" =~ ^\..*$ ]]; then
+                hidden_modules+=("$module")
             fi
         done
 
         if [[ ${#invalid_modules[@]} -gt 0 ]]; then
             log_error "Invalid modules: ${invalid_modules[*]}"
             log_info "Available modules:"
-            get_available_modules | sed 's/^/  /'
+            get_available_modules "false" | sed 's/^/  /'
+            if [[ ${#hidden_modules[@]} -gt 0 ]]; then
+                echo
+                log_info "Hidden modules are available but require --install-hidden flag:"
+                get_available_modules "true" | grep "^\." | sed 's/^/  /' || true
+            fi
             exit 1
+        fi
+        
+        # Check for hidden modules
+        if [[ ${#hidden_modules[@]} -gt 0 ]]; then
+            if [[ ${ALLOW_HIDDEN:-0} -ne 1 ]]; then
+                log_error "Hidden modules cannot be installed without --install-hidden flag"
+                log_error "Hidden modules specified: ${hidden_modules[*]}"
+                echo
+                log_warning "Hidden modules contain sensitive configurations and should remain private."
+                log_info "If you really need to install hidden modules, use:"
+                echo "  $PROGRAM_NAME install --install-hidden ${hidden_modules[*]}"
+                echo
+                log_error "Installation cancelled for security reasons"
+                exit 1
+            fi
+            
+            # Double confirmation for hidden modules
+            if ! confirm_hidden_installation "${hidden_modules[@]}"; then
+                exit 1
+            fi
         fi
 
         if [[ $DRY_RUN -eq 1 ]]; then

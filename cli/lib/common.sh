@@ -9,6 +9,7 @@
 
 # Get all available modules
 get_available_modules() {
+    local include_hidden="${1:-false}"
     local modules=()
 
     if [[ ! -d "$CONFIG_SOURCE_DIR" ]]; then
@@ -18,8 +19,37 @@ get_available_modules() {
     while IFS= read -r -d '' dir; do
         local module_name
         module_name=$(basename "$dir")
+        
+        # Skip hidden directories unless explicitly requested
+        if [[ "$module_name" =~ ^\..*$ ]] && [[ "$include_hidden" != "true" ]]; then
+            continue
+        fi
+        
+        # Skip if directory is empty (no files or subdirectories)
+        if [[ -z "$(find "$dir" -mindepth 1 -maxdepth 1 2>/dev/null)" ]]; then
+            continue
+        fi
+        
+        # Skip if directory contains only hidden files/directories and include_hidden is false
+        if [[ "$include_hidden" != "true" ]]; then
+            local has_visible_content=false
+            while IFS= read -r -d '' item; do
+                local item_name
+                item_name=$(basename "$item")
+                if [[ ! "$item_name" =~ ^\..*$ ]]; then
+                    has_visible_content=true
+                    break
+                fi
+            done < <(find "$dir" -mindepth 1 -maxdepth 1 -print0 2>/dev/null)
+            
+            if [[ "$has_visible_content" != "true" ]]; then
+                continue
+            fi
+        fi
+        
         modules+=("$module_name")
-    done < <(find "$CONFIG_SOURCE_DIR" -mindepth 1 -maxdepth 1 -type d -print0)
+    done < <(find "$CONFIG_SOURCE_DIR" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
+    
     printf '%s\n' "${modules[@]}" | sort
 }
 
