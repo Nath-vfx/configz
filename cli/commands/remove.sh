@@ -16,7 +16,7 @@ show_remove_help() {
 $PROGRAM_NAME remove - Remove installed configuration modules
 
 USAGE:
-    $PROGRAM_NAME remove [OPTIONS] [MODULE...]
+    $PROGRAM_NAME remove [OPTIONS] [MODULE...|--all]
 
 OPTIONS:
     -h, --help          Show this help message
@@ -25,9 +25,11 @@ OPTIONS:
     --no-symlink        Assume copy mode instead of symlinks
     -n, --dry-run       Show what would be removed without executing
     --clean             Remove backup files as well
+    -a, --all           Remove all installed modules
 
 ARGUMENTS:
     MODULE...           Specific modules to remove (space-separated)
+                        Cannot be used with --all
 
 EXAMPLES:
     $PROGRAM_NAME remove fish                # Remove fish module
@@ -166,9 +168,12 @@ update_removal_registry() {
 # Full implementation
 remove_main() {
     local modules=()
-    local force_removal=false
-    local clean_backups=false
-
+    local force_remove=0
+    local no_backup=0
+    local no_symlink=0
+    local clean_backups=0
+    local remove_all=0
+    
     # Parse command-specific options
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -177,52 +182,76 @@ remove_main() {
                 exit 0
                 ;;
             -f|--force)
-                FORCE=1
-                force_removal=true
+                force_remove=1
                 shift
                 ;;
             --no-backup)
-                NO_BACKUP=1
+                no_backup=1
                 shift
                 ;;
             --no-symlink)
-                NO_SYMLINK=1
+                no_symlink=1
+                shift
+                ;;
+            --clean)
+                clean_backups=1
+                shift
+                ;;
+            -a|--all)
+                remove_all=1
                 shift
                 ;;
             -n|--dry-run)
                 DRY_RUN=1
                 shift
                 ;;
-            --clean)
-                clean_backups=true
+            --)
                 shift
+                break
                 ;;
             -*)
                 log_error "Unknown option: $1"
-                log_info "Use '$PROGRAM_NAME remove --help' for available options"
+                show_remove_help
                 exit 1
                 ;;
             *)
+                if [[ $remove_all -eq 1 ]]; then
+                    log_error "Cannot specify modules with --all flag"
+                    show_remove_help
+                    exit 1
+                fi
                 modules+=("$1")
                 shift
                 ;;
         esac
     done
-
-    # Check if modules specified
-    if [[ ${#modules[@]} -eq 0 ]]; then
-        log_error "No modules specified"
-        log_info "Usage: $PROGRAM_NAME remove <MODULE...>"
-        log_info "Installed modules:"
-        while IFS= read -r module; do
-            if is_module_installed "$module"; then
-                local name icon
-                name=$(get_module_name "$module")
-                icon=$(get_module_icon "$module")
-                echo "  $icon $name ($module)"
-            fi
-        done < <(get_available_modules "false")
+    
+    # Validate arguments
+    if [[ $remove_all -eq 1 && ${#modules[@]} -gt 0 ]]; then
+        log_error "Cannot specify modules with --all flag"
+        show_remove_help
         exit 1
+    fi
+    
+    # If no modules specified and --all not used, show help
+    if [[ $remove_all -eq 0 && ${#modules[@]} -eq 0 ]]; then
+        log_error "No modules specified. Use --all to remove all modules"
+        show_remove_help
+        exit 1
+    fi
+    
+    # Get all installed modules if --all is specified
+    if [[ $remove_all -eq 1 ]]; then
+        log_info "Finding all installed modules..."
+        mapfile -t all_modules < <(find "$CONFIG_SOURCE_DIR" -maxdepth 1 -mindepth 1 -type d -exec basename {} \; | sort)
+        
+        if [[ ${#all_modules[@]} -eq 0 ]]; then
+            log_info "No installed modules found"
+            exit 0
+        fi
+        
+        modules=("${all_modules[@]}")
+        log_info "Found ${#modules[@]} modules to remove"
     fi
 
     # Validate modules exist and are installed
