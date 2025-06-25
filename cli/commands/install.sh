@@ -258,7 +258,7 @@ install_modules() {
         echo
     done
 
-    # Summary
+    # Résumé
     echo -e "${BOLD}Installation Summary:${NC}"
     echo -e "  ${GREEN}Successful:${NC} $successful"
     if [[ $failed -gt 0 ]]; then
@@ -274,6 +274,15 @@ install_modules() {
 
 # Install all modules
 install_all_modules() {
+    # Vérification de la variable d'environnement
+    if [[ -z "$CONFIG_SOURCE_DIR" ]]; then
+        log_error "CONFIG_SOURCE_DIR n'est pas définie !"
+        return 1
+    fi
+    if [[ ! -d "$CONFIG_SOURCE_DIR" ]]; then
+        log_error "Le dossier source des modules n'existe pas : $CONFIG_SOURCE_DIR"
+        return 1
+    fi
     local modules
     
     # Get modules based on ALLOW_HIDDEN flag
@@ -284,7 +293,8 @@ install_all_modules() {
         readarray -t modules < <(get_available_modules "false")
         log_info "Excluding hidden modules for security (use --install-hidden to include)"
     fi
-
+    # Debug : afficher la liste des modules trouvés
+    echo "[DEBUG] Modules trouvés : ${modules[*]}"
     if [[ ${#modules[@]} -eq 0 ]]; then
         if [[ ${ALLOW_HIDDEN:-0} -eq 1 ]]; then
             log_error "No modules found to install (including hidden)"

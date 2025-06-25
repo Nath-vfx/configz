@@ -189,7 +189,22 @@ create_backup() {
     local target_path="$1"
     local timestamp
     timestamp=$(date +"%Y%m%d_%H%M%S")
-    local backup_path="${target_path}.backup.${timestamp}"
+    
+    # Get the base name of the target path
+    local target_name=$(basename "$target_path")
+    
+    # Create backup directory if it doesn't exist
+    local backup_dir="$HOME/.config/configz/backups"
+    mkdir -p "$backup_dir"
+    
+    # Create backup path in the configz backup directory
+    local backup_path="${backup_dir}/${target_name}.backup.${timestamp}"
+
+    # Skip backup if target is a symlink
+    if [[ -L "$target_path" ]]; then
+        log_debug "Skipping backup for symlink: $target_path"
+        return 0
+    fi
 
     if [[ -e "$target_path" ]]; then
         if [[ $DRY_RUN -eq 1 ]]; then

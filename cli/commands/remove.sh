@@ -51,10 +51,16 @@ EOF
 }
 
 # Remove a single module
+# Returns:
+#   0: Success (with or without backup)
+#   1: Failure
+# Outputs:
+#   "backup_created" if a backup was actually created
 remove_single_module() {
     local module="$1"
     local target_path
     target_path=$(get_module_target_path "$module")
+    local backup_created=0
 
     log_info "Removing module: $module"
 
@@ -70,6 +76,8 @@ remove_single_module() {
         backup_path=$(create_backup "$target_path")
         if [[ -n "$backup_path" ]]; then
             log_info "Created backup: $(basename "$backup_path")"
+            backup_created=1
+            echo "backup_created"
         fi
     fi
 
@@ -93,9 +101,14 @@ clean_module_backups() {
     local module="$1"
     local target_path
     target_path=$(get_module_target_path "$module")
-    local backup_pattern="${target_path}.backup.*"
+    local target_name=$(basename "$target_path")
+    local backup_dir="$HOME/.config/configz/backups"
+    local backup_pattern="${backup_dir}/${target_name}.backup.*"
 
     log_info "Cleaning backups for module: $module"
+
+    # Ensure backup directory exists
+    mkdir -p "$backup_dir"
 
     local cleaned_count=0
     for backup in ${backup_pattern}; do
@@ -256,7 +269,13 @@ remove_main() {
 
         # Show if backups exist
         local backup_count=0
-        local backup_pattern="${target_path}.backup.*"
+        local target_name=$(basename "$target_path")
+        local backup_dir="$HOME/.config/configz/backups"
+        local backup_pattern="${backup_dir}/${target_name}.backup.*"
+        
+        # Ensure backup directory exists
+        mkdir -p "$backup_dir"
+        
         for backup in ${backup_pattern}; do
             [[ -e "$backup" ]] && backup_count=$((backup_count + 1))
         done
@@ -274,8 +293,23 @@ remove_main() {
         echo -e "${BOLD}Actions:${NC}"
     fi
 
+    # Check if target is a symlink
+    local is_symlink=false
+    for module in "${valid_modules[@]}"; do
+        local target_path
+        target_path=$(get_module_target_path "$module")
+        if [[ -L "$target_path" ]]; then
+            is_symlink=true
+            break
+        fi
+    done
+
     if [[ $NO_BACKUP -eq 0 ]]; then
-        echo -e "  ${BLUE}✓${NC} Create backups before removal"
+        if [[ $is_symlink == true ]]; then
+            echo -e "  ${DIM}○ Skip backups (target is a symlink)${NC}"
+        else
+            echo -e "  ${BLUE}✓${NC} Create backups before removal"
+        fi
     else
         echo -e "  ${DIM}○ Skip backups (--no-backup)${NC}"
     fi
@@ -303,17 +337,25 @@ remove_main() {
     # Perform removal
     local successful=0
     local failed=0
-
-    if [[ $DRY_RUN -eq 1 ]]; then
-        log_info "DRY RUN: Would remove ${#valid_modules[@]} modules"
-    else
-        log_info "Removing ${#valid_modules[@]} modules..."
-    fi
-
-    echo
-
+    local any_backup_created=0
     for module in "${valid_modules[@]}"; do
-        if remove_single_module "$module"; then
+        # Capture output to check for backup creation
+        local output
+        output=$(remove_single_module "$module" 2>&1)
+        local status=$?
+        
+        # Check if a backup was created
+        if [[ "$output" == *"backup_created"* ]]; then
+            any_backup_created=1
+            # Remove the backup_created line from output
+            output=$(echo "$output" | grep -v '^backup_created$')
+        fi
+        
+        # Log the output
+        echo -n "$output"
+        
+        # Update counters based on status
+        if [[ $status -eq 0 ]]; then
             successful=$((successful + 1))
         else
             failed=$((failed + 1))
@@ -343,7 +385,7 @@ remove_main() {
         echo -e "  ${BOLD}Total:${NC} ${#valid_modules[@]}"
 
         if [[ $successful -gt 0 ]]; then
-            if [[ $NO_BACKUP -eq 0 ]]; then
+            if [[ $NO_BACKUP -eq 0 ]] && [[ $any_backup_created -eq 1 ]]; then
                 echo -e "  ${BLUE}Backups:${NC} Created before removal"
             fi
             echo -e "  ${CYAN}Registry:${NC} Updated"
@@ -353,7 +395,7 @@ remove_main() {
     if [[ $DRY_RUN -eq 0 && $successful -gt 0 ]]; then
         echo
         log_success "Removal completed successfully!"
-        if [[ $NO_BACKUP -eq 0 ]]; then
+        if [[ $NO_BACKUP -eq 0 ]] && [[ $any_backup_created -eq 1 ]]; then
             log_info "Backups were created - you can restore modules if needed"
         fi
     fi
