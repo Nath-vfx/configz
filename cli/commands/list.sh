@@ -49,12 +49,26 @@ list_modules_table() {
     local no_color="$3"  # 0 or 1
     local show_hidden="$4"  # 0 or 1
 
+    # Vérifier d'abord si le répertoire des modules existe et n'est pas vide
+    if [[ ! -d "$CONFIG_SOURCE_DIR" ]] || [[ -z "$(ls -A "$CONFIG_SOURCE_DIR" 2>/dev/null)" ]]; then
+        log_info "No modules found in $CONFIG_SOURCE_DIR"
+        log_info "Create your first module with: $PROGRAM_NAME init <name>"
+        return 0
+    fi
+
     local modules
     readarray -t modules < <(get_available_modules $([ "$show_hidden" -eq 1 ] && echo "true" || echo "false"))
 
+    # Vérifier s'il y a des modules après filtrage
     if [[ ${#modules[@]} -eq 0 ]]; then
-        log_info "No modules found in $CONFIG_SOURCE_DIR"
-        log_info "Create your first module with: $PROGRAM_NAME init <name>"
+        if [[ "$filter" == "installed" ]]; then
+            log_info "No installed modules found in $CONFIG_SOURCE_DIR"
+        elif [[ "$filter" == "uninstalled" ]]; then
+            log_info "No uninstalled modules found in $CONFIG_SOURCE_DIR"
+        else
+            log_info "No modules found in $CONFIG_SOURCE_DIR"
+        fi
+        log_info "Create a new module with: $PROGRAM_NAME init <name>"
         return 0
     fi
 
@@ -76,6 +90,44 @@ list_modules_table() {
     fi
 
     local count=0
+    local has_visible_modules=0
+    
+    # Premier passage pour compter les modules visibles après filtrage
+    for module in "${modules[@]}"; do
+        local installed
+        if is_module_installed "$module"; then
+            installed="yes"
+        else
+            installed="no"
+        fi
+
+        # Appliquer le filtre
+        case "$filter" in
+            installed)
+                [[ "$installed" != "yes" ]] && continue
+                ;;
+            uninstalled)
+                [[ "$installed" != "no" ]] && continue
+                ;;
+        esac
+        has_visible_modules=1
+        break
+    done
+    
+    # Si aucun module n'est visible après filtrage
+    if [[ $has_visible_modules -eq 0 ]]; then
+        if [[ "$filter" == "installed" ]]; then
+            log_info "No installed modules found in $CONFIG_SOURCE_DIR"
+        elif [[ "$filter" == "uninstalled" ]]; then
+            log_info "No uninstalled modules found in $CONFIG_SOURCE_DIR"
+        else
+            log_info "No modules found in $CONFIG_SOURCE_DIR"
+        fi
+        log_info "Create a new module with: $PROGRAM_NAME init <name>"
+        return 0
+    fi
+    
+    # Deuxième passage pour afficher les modules
     for module in "${modules[@]}"; do
         local installed
         if is_module_installed "$module"; then

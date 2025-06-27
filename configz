@@ -93,6 +93,7 @@ VERSION:
     $VERSION (alpha - new CLI interface)
 
 COMMANDS:
+    init [MODULE]           Initialize a new configuration module
     install [MODULE...]     Install configuration modules
     list                    List available modules
     status                  Show installation status
