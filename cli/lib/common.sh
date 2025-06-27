@@ -115,7 +115,7 @@ get_module_target_path() {
     log_debug "[get_module_target_path] Getting target path for module: $module"
     log_debug "[get_module_target_path] Module config path: $module_config"
     
-    # Default to $HOME/.config/module_name if no config file
+    # Vérifier si le fichier de configuration existe
     if [[ ! -f "$module_config" ]]; then
         local default_path="$HOME/.config/$(basename "$module")"
         log_debug "[get_module_target_path] No config file found, using default path: $default_path"
@@ -123,14 +123,14 @@ get_module_target_path() {
         return 0
     fi
     
-    # Try to get target from config file
+    # Essayer de lire le chemin cible depuis le fichier de configuration
     log_debug "[get_module_target_path] Reading target from config file"
     local target_path
-    target_path=$(grep -E '^target\s*=' "$module_config" | head -n 1 | cut -d '=' -f 2- | tr -d "'\" ")
+    target_path=$(grep -E '^target\s*=' "$module_config" | head -n 1 | cut -d '=' -f 2- | sed -e 's/^[ \t]*//' -e 's/[ \t]*$//' -e "s/^['\"]\(.*\)['\"]\?\$/\1/")
     
     log_debug "[get_module_target_path] Raw target_path from config: '$target_path'"
     
-    # If target is not specified, use default
+    # Si aucun chemin n'est spécifié, utiliser le chemin par défaut
     if [[ -z "$target_path" ]]; then
         local default_path="$HOME/.config/$(basename "$module")"
         log_debug "[get_module_target_path] No target specified in config, using default path: $default_path"
@@ -138,36 +138,42 @@ get_module_target_path() {
         return 0
     fi
     
-    # Expand ~ to $HOME
-    target_path=${target_path/#\~/$HOME}
-    log_debug "[get_module_target_path] Expanded target_path: $target_path"
+    # Supprimer les guillemets éventuels et les espaces
+    target_path=$(echo "$target_path" | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\([^']*\)'\$/\1/")
     
+    # Remplacer ~ par $HOME
+    target_path="${target_path/#\~/$HOME}"
+    
+    # Si le chemin est relatif, le rendre absolu par rapport à $HOME/.config
+    if [[ "$target_path" != /* ]]; then
+        target_path="$HOME/.config/$target_path"
+    fi
+    
+    # Nettoyer le chemin (supprimer les //, /./, etc.)
+    target_path=$(echo "$target_path" | sed 's#/\./#/#g; s#//*#/#g')
+    
+    log_debug "[get_module_target_path] Final target path: $target_path"
     echo "$target_path"
     return 0
 }
 
-# Check if module is installed
+# Vérifie si un module est installé
 is_module_installed() {
     local module="$1"
     local target_path
-    set +e
     target_path=$(get_module_target_path "$module")
-    local result=0
     
-    log_debug "[is_module_installed] Checking if module '$module' is installed"
-    log_debug "[is_module_installed] Target path: $target_path"
+    log_debug "Checking if module is installed: $module"
+    log_debug "Target path: $target_path"
     
-    # Check if target exists (directory or symlink)
-    if [[ -d "$target_path" || -L "$target_path" ]]; then
-        log_debug "[is_module_installed] Module '$module' is installed (directory or symlink exists)"
-        result=0
+    # Vérifier si la cible existe (lien symbolique ou répertoire)
+    if [[ -e "$target_path" || -L "$target_path" ]]; then
+        log_debug "Module '$module' is installed at $target_path"
+        return 0  # Succès - le module est installé
     else
-        log_debug "[is_module_installed] Module '$module' is NOT installed (no directory or symlink at $target_path)"
-        result=1
+        log_debug "Module '$module' is NOT installed (not found at $target_path)"
+        return 1  # Échec - le module n'est pas installé
     fi
-    
-    set -e
-    return $result
 }
 
 # =============================================================================
@@ -294,84 +300,65 @@ install_module_files() {
     local target_path
     target_path=$(get_module_target_path "$module")
     
-    log_debug "[install_module_files] Module: $module"
-    log_debug "[install_module_files] Source path: $source_path"
-    log_debug "[install_module_files] Target path: $target_path"
-    log_debug "[install_module_files] NO_SYMLINK: $NO_SYMLINK"
-    log_debug "[install_module_files] DRY_RUN: $DRY_RUN"
-    log_debug "[install_module_files] Files in source: $(ls -la "$source_path" 2>/dev/null || echo 'No source directory')"
-
-    # Create backup if target exists and backup is enabled
-    if [[ $NO_BACKUP -eq 0 ]] && [[ -e "$target_path" ]]; then
-        create_backup "$target_path"
+    log_info "Installing module: $module"
+    log_debug "Source: $source_path"
+    log_debug "Target: $target_path"
+    
+    # Vérifier si la source existe
+    if [[ ! -d "$source_path" ]]; then
+        log_error "Module source not found: $source_path"
+        return 1
     fi
-
-    # Remove existing target if it exists
-    if [[ -e "$target_path" || -L "$target_path" ]]; then
-        if [[ $DRY_RUN -eq 1 ]]; then
-            log_info "Would remove existing: $target_path"
-        else
-            rm -rf "$target_path"
+    
+    # Vérifier si la cible existe déjà
+    if [[ -e "$target_path" ]]; then
+        log_warning "Target already exists: $target_path"
+        if [[ $FORCE -ne 1 ]] && ! confirm "Overwrite existing target?"; then
+            log_info "Skipping $module"
+            return 0
+        fi
+        
+        # Faire une sauvegarde si nécessaire
+        if [[ $NO_BACKUP -eq 0 ]]; then
+            create_backup "$target_path"
         fi
     fi
-
+    
+    # Créer le répertoire parent si nécessaire
+    mkdir -p "$(dirname "$target_path")"
+    
+    # Installation avec ou sans lien symbolique
     if [[ $NO_SYMLINK -eq 1 ]]; then
-        # Legacy mode: copy files to target directory
+        # Copie des fichiers (sans le configz.toml)
+        log_info "Copying files for $module..."
         if [[ $DRY_RUN -eq 1 ]]; then
-            log_info "Would create directory: $target_path"
+            log_info "[DRY RUN] Would copy files from $source_path to $target_path"
         else
-            mkdir -p "$target_path"
-        fi
-
-        # Copy files (excluding configz.toml)
-        local files_copied=0
-        while IFS= read -r -d '' file; do
-            local relative_path="${file#$source_path/}"
-
-            # Skip configz.toml
-            if [[ "$relative_path" == "configz.toml" ]]; then
-                continue
+            # Copier tous les fichiers sauf configz.toml
+            if ! (cd "$source_path" && find . -type f ! -name 'configz.toml' -exec install -Dm 644 {} "$target_path/{}" \;); then
+                log_error "Failed to copy files for $module"
+                return 1
             fi
-
-            local target_file="$target_path/$relative_path"
-            local target_dir
-            target_dir=$(dirname "$target_file")
-
-            if [[ $DRY_RUN -eq 1 ]]; then
-                log_info "Would copy: $relative_path"
-            else
-                mkdir -p "$target_dir"
-                cp -r "$file" "$target_file"
-                log_debug "Copied: $relative_path"
-            fi
-
-            ((files_copied++))
-        done < <(find "$source_path" -type f -print0)
-
-        if [[ $files_copied -eq 0 ]]; then
-            log_warning "No files found to install in module '$module'"
-            return 1
+            log_success "Copied module '$module' to $target_path"
         fi
-
-        log_success "Installed module '$module' ($files_copied files copied)"
     else
-        # New default mode: create symlink to module directory
+        # Créer un lien symbolique
+        log_info "Creating symlink for $module..."
         if [[ $DRY_RUN -eq 1 ]]; then
-            log_info "Would create symlink: $target_path -> $source_path"
+            log_info "[DRY RUN] Would create symlink: $target_path -> $source_path"
         else
-            # Ensure parent directory exists
+            # Créer le répertoire parent si nécessaire
             mkdir -p "$(dirname "$target_path")"
             
-            # Create symlink
-            log_debug "[install_module_files] Creating symlink: $target_path -> $source_path"
-            ln -sfv "$source_path" "$target_path"
-            log_debug "[install_module_files] Symlink created. Result: $?"
-            log_debug "[install_module_files] ls -la $(dirname "$target_path")/$(basename "$target_path"): $(ls -la "$(dirname "$target_path")/$(basename "$target_path" 2>/dev/null)" 2>/dev/null || echo 'No such file')"
+            # Créer le lien symbolique
+            ln -sf "$CONFIG_SOURCE_DIR/$module" "$target_path" || {
+                log_error "Failed to create symlink for $module"
+                return 1
+            }
+            log_success "Created symlink: $target_path -> $CONFIG_SOURCE_DIR/$module"
         fi
-
-        log_success "Installed module '$module' (symlinked)"
     fi
-
+    
     return 0
 }
 
@@ -380,53 +367,42 @@ remove_module_files() {
     local module="$1"
     local target_path
     target_path=$(get_module_target_path "$module")
+    
+    log_info "Removing module: $module"
+    log_debug "Target: $target_path"
 
+    # Vérifier si le module est installé
     if [[ ! -e "$target_path" && ! -L "$target_path" ]]; then
         log_warning "Module '$module' is not installed"
         return 1
     fi
-
-    # Check if it's a symlink or a copied directory
-    if [[ -L "$target_path" ]]; then
-        log_info "Removing symlinked module: $module"
-        
-        # Create backup before removal (backup the symlink itself)
-        if [[ $NO_BACKUP -eq 0 ]]; then
-            local timestamp
-            timestamp=$(date +"%Y%m%d_%H%M%S")
-            local backup_path="${target_path}.symlink_backup.${timestamp}"
-            
-            if [[ $DRY_RUN -eq 1 ]]; then
-                log_info "Would backup symlink: $target_path -> $backup_path"
-            else
-                cp -P "$target_path" "$backup_path"
-                log_info "Backup created: $backup_path"
-            fi
-        fi
-
-        # Remove the symlink
-        if [[ $DRY_RUN -eq 1 ]]; then
-            log_info "Would remove symlink: $target_path"
-        else
-            rm "$target_path"
-            log_success "Removed symlink: $target_path"
-        fi
+    
+    # Faire une sauvegarde si nécessaire
+    if [[ $NO_BACKUP -eq 0 ]]; then
+        create_backup "$target_path"
+    fi
+    
+    # Supprimer la cible (lien symbolique ou répertoire)
+    if [[ $DRY_RUN -eq 1 ]]; then
+        log_info "[DRY RUN] Would remove: $target_path"
     else
-        log_info "Removing copied module: $module"
-        
-        # Create backup before removal
-        if [[ $NO_BACKUP -eq 0 ]]; then
-            create_backup "$target_path"
-        fi
-
-        if [[ $DRY_RUN -eq 1 ]]; then
-            log_info "Would remove directory: $target_path"
+        if [[ -L "$target_path" ]]; then
+            # Supprimer un lien symbolique
+            rm -f "$target_path" || {
+                log_error "Failed to remove symlink: $target_path"
+                return 1
+            }
+            log_success "Removed symlink: $target_path"
         else
-            rm -rf "$target_path"
+            # Supprimer un répertoire
+            rm -rf "$target_path" || {
+                log_error "Failed to remove directory: $target_path"
+                return 1
+            }
             log_success "Removed directory: $target_path"
         fi
     fi
-
+    
     return 0
 }
 
