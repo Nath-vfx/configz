@@ -628,7 +628,8 @@ confirm() {
 get_file_count() {
     local dir="$1"
     if [[ -d "$dir" ]]; then
-        find "$dir" -type f | wc -l
+        # Supprimer les espaces en utilisant l'expansion arithmétique
+        echo $(( $(find "$dir" -type f | wc -l) ))
     else
         echo "0"
     fi
