@@ -53,10 +53,52 @@ get_available_modules() {
     printf '%s\n' "${modules[@]}" | sort
 }
 
-# Check if module exists
-module_exists() {
+# Check if module exists (common implementation)
+module_exists_common() {
     local module="$1"
-    [[ -d "$CONFIG_SOURCE_DIR/$module" ]]
+    
+    # Debug: Print function arguments and environment
+    log_debug "[module_exists_common] Function called with module: $module"
+    log_debug "[module_exists_common] CONFIG_SOURCE_DIR: $CONFIG_SOURCE_DIR"
+    log_debug "[module_exists_common] Full path being checked: $CONFIG_SOURCE_DIR/$module"
+    
+    # Check if CONFIG_SOURCE_DIR is set
+    if [[ -z "$CONFIG_SOURCE_DIR" ]]; then
+        log_debug "[module_exists_common] ERROR: CONFIG_SOURCE_DIR is not set"
+        return 1
+    fi
+    
+    # Check if CONFIG_SOURCE_DIR exists
+    if [[ ! -d "$CONFIG_SOURCE_DIR" ]]; then
+        log_debug "[module_exists_common] ERROR: CONFIG_SOURCE_DIR does not exist: $CONFIG_SOURCE_DIR"
+        return 1
+    fi
+    
+    # Check if module directory exists
+    if [[ -d "$CONFIG_SOURCE_DIR/$module" ]]; then
+        log_debug "[module_exists_common] Module directory exists: $CONFIG_SOURCE_DIR/$module"
+        
+        # Check if the directory is readable
+        if [[ ! -r "$CONFIG_SOURCE_DIR/$module" ]]; then
+            log_debug "[module_exists_common] WARNING: Module directory exists but is not readable: $CONFIG_SOURCE_DIR/$module"
+            return 1
+        fi
+        
+        # List contents of the module directory for debugging
+        log_debug "[module_exists_common] Module directory contents: $(ls -la "$CONFIG_SOURCE_DIR/$module" 2>&1 || echo "Cannot list module directory")"
+        
+        log_debug "[module_exists_common] Module '$module' found and is accessible"
+        return 0
+    else
+        log_debug "[module_exists_common] Module directory does not exist: $CONFIG_SOURCE_DIR/$module"
+        log_debug "[module_exists_common] Parent directory contents: $(ls -la "$CONFIG_SOURCE_DIR/" 2>&1 || echo "Cannot list parent directory")"
+        return 1
+    fi
+}
+
+# Alias for backward compatibility
+module_exists() {
+    module_exists_common "$@"
 }
 
 # Get module path
@@ -65,25 +107,42 @@ get_module_path() {
     echo "$CONFIG_SOURCE_DIR/$module"
 }
 
-# Get module target path
+# Get the target path where a module should be installed
 get_module_target_path() {
     local module="$1"
-    local config_file="$CONFIG_SOURCE_DIR/$module/configz.toml"
-
-    set +e
-    if [[ -f "$config_file" ]] && command -v yq >/dev/null 2>&1; then
-        local custom_target
-        custom_target=$(yq eval '.paths.target // ""' "$config_file" 2>/dev/null || echo "")
-        if [[ -n "$custom_target" && "$custom_target" != "null" && "$custom_target" != '""' ]]; then
-            set -e
-            echo "$TARGET_BASE_DIR/$custom_target"
-            return 0
-        fi
+    local module_config="$CONFIG_SOURCE_DIR/$module/configz.toml"
+    
+    log_debug "[get_module_target_path] Getting target path for module: $module"
+    log_debug "[get_module_target_path] Module config path: $module_config"
+    
+    # Default to $HOME/.config/module_name if no config file
+    if [[ ! -f "$module_config" ]]; then
+        local default_path="$HOME/.config/$(basename "$module")"
+        log_debug "[get_module_target_path] No config file found, using default path: $default_path"
+        echo "$default_path"
+        return 0
     fi
-    set -e
-
-    # Default target path
-    echo "$TARGET_BASE_DIR/$module"
+    
+    # Try to get target from config file
+    log_debug "[get_module_target_path] Reading target from config file"
+    local target_path
+    target_path=$(grep -E '^target\s*=' "$module_config" | head -n 1 | cut -d '=' -f 2- | tr -d "'\" ")
+    
+    log_debug "[get_module_target_path] Raw target_path from config: '$target_path'"
+    
+    # If target is not specified, use default
+    if [[ -z "$target_path" ]]; then
+        local default_path="$HOME/.config/$(basename "$module")"
+        log_debug "[get_module_target_path] No target specified in config, using default path: $default_path"
+        echo "$default_path"
+        return 0
+    fi
+    
+    # Expand ~ to $HOME
+    target_path=${target_path/#\~/$HOME}
+    log_debug "[get_module_target_path] Expanded target_path: $target_path"
+    
+    echo "$target_path"
     return 0
 }
 
@@ -94,8 +153,19 @@ is_module_installed() {
     set +e
     target_path=$(get_module_target_path "$module")
     local result=0
+    
+    log_debug "[is_module_installed] Checking if module '$module' is installed"
+    log_debug "[is_module_installed] Target path: $target_path"
+    
     # Check if target exists (directory or symlink)
-    [[ -d "$target_path" || -L "$target_path" ]] || result=1
+    if [[ -d "$target_path" || -L "$target_path" ]]; then
+        log_debug "[is_module_installed] Module '$module' is installed (directory or symlink exists)"
+        result=0
+    else
+        log_debug "[is_module_installed] Module '$module' is NOT installed (no directory or symlink at $target_path)"
+        result=1
+    fi
+    
     set -e
     return $result
 }
@@ -223,6 +293,13 @@ install_module_files() {
     local source_path="$CONFIG_SOURCE_DIR/$module"
     local target_path
     target_path=$(get_module_target_path "$module")
+    
+    log_debug "[install_module_files] Module: $module"
+    log_debug "[install_module_files] Source path: $source_path"
+    log_debug "[install_module_files] Target path: $target_path"
+    log_debug "[install_module_files] NO_SYMLINK: $NO_SYMLINK"
+    log_debug "[install_module_files] DRY_RUN: $DRY_RUN"
+    log_debug "[install_module_files] Files in source: $(ls -la "$source_path" 2>/dev/null || echo 'No source directory')"
 
     # Create backup if target exists and backup is enabled
     if [[ $NO_BACKUP -eq 0 ]] && [[ -e "$target_path" ]]; then
@@ -286,8 +363,10 @@ install_module_files() {
             mkdir -p "$(dirname "$target_path")"
             
             # Create symlink
-            ln -sf "$source_path" "$target_path"
-            log_debug "Created symlink: $target_path -> $source_path"
+            log_debug "[install_module_files] Creating symlink: $target_path -> $source_path"
+            ln -sfv "$source_path" "$target_path"
+            log_debug "[install_module_files] Symlink created. Result: $?"
+            log_debug "[install_module_files] ls -la $(dirname "$target_path")/$(basename "$target_path"): $(ls -la "$(dirname "$target_path")/$(basename "$target_path" 2>/dev/null)" 2>/dev/null || echo 'No such file')"
         fi
 
         log_success "Installed module '$module' (symlinked)"
