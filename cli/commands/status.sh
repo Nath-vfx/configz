@@ -75,11 +75,32 @@ get_last_modified() {
 # Get directory size
 get_directory_size() {
     local dir="$1"
+    local size="0B"
+    
     if [[ -d "$dir" ]]; then
-        du -sh "$dir" 2>/dev/null | cut -f1
-    else
-        echo "0B"
+        # Try to get size with du, fallback to find if du fails
+        if command -v du >/dev/null 2>&1; then
+            size=$(du -sh "$dir" 2>/dev/null | cut -f1) || size="0B"
+        else
+            # Fallback using find if du is not available
+            local bytes
+            bytes=$(find "$dir" -type f -exec stat -f%z {} + 2>/dev/null | awk '{s+=$1} END {print s}')
+            if [[ -n "$bytes" && "$bytes" -gt 0 ]]; then
+                # Convert bytes to human readable format
+                if [[ $bytes -ge 1073741824 ]]; then
+                    size=$(awk "BEGIN {printf \"%.1fG\", $bytes/1073741824}")
+                elif [[ $bytes -ge 1048576 ]]; then
+                    size=$(awk "BEGIN {printf \"%.1fM\", $bytes/1048576}")
+                elif [[ $bytes -ge 1024 ]]; then
+                    size=$(awk "BEGIN {printf \"%.1fK\", $bytes/1024}")
+                else
+                    size="${bytes}B"
+                fi
+            fi
+        fi
     fi
+    
+    echo "${size:-0B}"
 }
 
 # Check for backups

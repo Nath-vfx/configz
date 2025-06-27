@@ -16,7 +16,7 @@ show_remove_help() {
 $PROGRAM_NAME remove - Remove installed configuration modules
 
 USAGE:
-    $PROGRAM_NAME remove [OPTIONS] [MODULE...]
+    $PROGRAM_NAME remove [OPTIONS] [MODULE...|--all]
 
 OPTIONS:
     -h, --help          Show this help message
@@ -25,9 +25,11 @@ OPTIONS:
     --no-symlink        Assume copy mode instead of symlinks
     -n, --dry-run       Show what would be removed without executing
     --clean             Remove backup files as well
+    -a, --all           Remove all installed modules
 
 ARGUMENTS:
     MODULE...           Specific modules to remove (space-separated)
+                        Cannot be used with --all
 
 EXAMPLES:
     $PROGRAM_NAME remove fish                # Remove fish module
@@ -51,10 +53,16 @@ EOF
 }
 
 # Remove a single module
+# Returns:
+#   0: Success (with or without backup)
+#   1: Failure
+# Outputs:
+#   "backup_created" if a backup was actually created
 remove_single_module() {
     local module="$1"
     local target_path
     target_path=$(get_module_target_path "$module")
+    local backup_created=0
 
     log_info "Removing module: $module"
 
@@ -70,6 +78,8 @@ remove_single_module() {
         backup_path=$(create_backup "$target_path")
         if [[ -n "$backup_path" ]]; then
             log_info "Created backup: $(basename "$backup_path")"
+            backup_created=1
+            echo "backup_created"
         fi
     fi
 
@@ -93,9 +103,14 @@ clean_module_backups() {
     local module="$1"
     local target_path
     target_path=$(get_module_target_path "$module")
-    local backup_pattern="${target_path}.backup.*"
+    local target_name=$(basename "$target_path")
+    local backup_dir="$HOME/.config/configz/backups"
+    local backup_pattern="${backup_dir}/${target_name}.backup.*"
 
     log_info "Cleaning backups for module: $module"
+
+    # Ensure backup directory exists
+    mkdir -p "$backup_dir"
 
     local cleaned_count=0
     for backup in ${backup_pattern}; do
@@ -153,9 +168,12 @@ update_removal_registry() {
 # Full implementation
 remove_main() {
     local modules=()
-    local force_removal=false
-    local clean_backups=false
-
+    local force_remove=0
+    local no_backup=0
+    local no_symlink=0
+    local clean_backups=0
+    local remove_all=0
+    
     # Parse command-specific options
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -164,52 +182,76 @@ remove_main() {
                 exit 0
                 ;;
             -f|--force)
-                FORCE=1
-                force_removal=true
+                force_remove=1
                 shift
                 ;;
             --no-backup)
-                NO_BACKUP=1
+                no_backup=1
                 shift
                 ;;
             --no-symlink)
-                NO_SYMLINK=1
+                no_symlink=1
+                shift
+                ;;
+            --clean)
+                clean_backups=1
+                shift
+                ;;
+            -a|--all)
+                remove_all=1
                 shift
                 ;;
             -n|--dry-run)
                 DRY_RUN=1
                 shift
                 ;;
-            --clean)
-                clean_backups=true
+            --)
                 shift
+                break
                 ;;
             -*)
                 log_error "Unknown option: $1"
-                log_info "Use '$PROGRAM_NAME remove --help' for available options"
+                show_remove_help
                 exit 1
                 ;;
             *)
+                if [[ $remove_all -eq 1 ]]; then
+                    log_error "Cannot specify modules with --all flag"
+                    show_remove_help
+                    exit 1
+                fi
                 modules+=("$1")
                 shift
                 ;;
         esac
     done
-
-    # Check if modules specified
-    if [[ ${#modules[@]} -eq 0 ]]; then
-        log_error "No modules specified"
-        log_info "Usage: $PROGRAM_NAME remove <MODULE...>"
-        log_info "Installed modules:"
-        while IFS= read -r module; do
-            if is_module_installed "$module"; then
-                local name icon
-                name=$(get_module_name "$module")
-                icon=$(get_module_icon "$module")
-                echo "  $icon $name ($module)"
-            fi
-        done < <(get_available_modules "false")
+    
+    # Validate arguments
+    if [[ $remove_all -eq 1 && ${#modules[@]} -gt 0 ]]; then
+        log_error "Cannot specify modules with --all flag"
+        show_remove_help
         exit 1
+    fi
+    
+    # If no modules specified and --all not used, show help
+    if [[ $remove_all -eq 0 && ${#modules[@]} -eq 0 ]]; then
+        log_error "No modules specified. Use --all to remove all modules"
+        show_remove_help
+        exit 1
+    fi
+    
+    # Get all installed modules if --all is specified
+    if [[ $remove_all -eq 1 ]]; then
+        log_info "Finding all installed modules..."
+        mapfile -t all_modules < <(find "$CONFIG_SOURCE_DIR" -maxdepth 1 -mindepth 1 -type d -exec basename {} \; | sort)
+        
+        if [[ ${#all_modules[@]} -eq 0 ]]; then
+            log_info "No installed modules found"
+            exit 0
+        fi
+        
+        modules=("${all_modules[@]}")
+        log_info "Found ${#modules[@]} modules to remove"
     fi
 
     # Validate modules exist and are installed
@@ -256,7 +298,13 @@ remove_main() {
 
         # Show if backups exist
         local backup_count=0
-        local backup_pattern="${target_path}.backup.*"
+        local target_name=$(basename "$target_path")
+        local backup_dir="$HOME/.config/configz/backups"
+        local backup_pattern="${backup_dir}/${target_name}.backup.*"
+        
+        # Ensure backup directory exists
+        mkdir -p "$backup_dir"
+        
         for backup in ${backup_pattern}; do
             [[ -e "$backup" ]] && backup_count=$((backup_count + 1))
         done
@@ -274,8 +322,23 @@ remove_main() {
         echo -e "${BOLD}Actions:${NC}"
     fi
 
+    # Check if target is a symlink
+    local is_symlink=false
+    for module in "${valid_modules[@]}"; do
+        local target_path
+        target_path=$(get_module_target_path "$module")
+        if [[ -L "$target_path" ]]; then
+            is_symlink=true
+            break
+        fi
+    done
+
     if [[ $NO_BACKUP -eq 0 ]]; then
-        echo -e "  ${BLUE}✓${NC} Create backups before removal"
+        if [[ $is_symlink == true ]]; then
+            echo -e "  ${DIM}○ Skip backups (target is a symlink)${NC}"
+        else
+            echo -e "  ${BLUE}✓${NC} Create backups before removal"
+        fi
     else
         echo -e "  ${DIM}○ Skip backups (--no-backup)${NC}"
     fi
@@ -303,17 +366,25 @@ remove_main() {
     # Perform removal
     local successful=0
     local failed=0
-
-    if [[ $DRY_RUN -eq 1 ]]; then
-        log_info "DRY RUN: Would remove ${#valid_modules[@]} modules"
-    else
-        log_info "Removing ${#valid_modules[@]} modules..."
-    fi
-
-    echo
-
+    local any_backup_created=0
     for module in "${valid_modules[@]}"; do
-        if remove_single_module "$module"; then
+        # Capture output to check for backup creation
+        local output
+        output=$(remove_single_module "$module" 2>&1)
+        local status=$?
+        
+        # Check if a backup was created
+        if [[ "$output" == *"backup_created"* ]]; then
+            any_backup_created=1
+            # Remove the backup_created line from output
+            output=$(echo "$output" | grep -v '^backup_created$')
+        fi
+        
+        # Log the output
+        echo -n "$output"
+        
+        # Update counters based on status
+        if [[ $status -eq 0 ]]; then
             successful=$((successful + 1))
         else
             failed=$((failed + 1))
@@ -343,7 +414,7 @@ remove_main() {
         echo -e "  ${BOLD}Total:${NC} ${#valid_modules[@]}"
 
         if [[ $successful -gt 0 ]]; then
-            if [[ $NO_BACKUP -eq 0 ]]; then
+            if [[ $NO_BACKUP -eq 0 ]] && [[ $any_backup_created -eq 1 ]]; then
                 echo -e "  ${BLUE}Backups:${NC} Created before removal"
             fi
             echo -e "  ${CYAN}Registry:${NC} Updated"
@@ -353,7 +424,7 @@ remove_main() {
     if [[ $DRY_RUN -eq 0 && $successful -gt 0 ]]; then
         echo
         log_success "Removal completed successfully!"
-        if [[ $NO_BACKUP -eq 0 ]]; then
+        if [[ $NO_BACKUP -eq 0 ]] && [[ $any_backup_created -eq 1 ]]; then
             log_info "Backups were created - you can restore modules if needed"
         fi
     fi

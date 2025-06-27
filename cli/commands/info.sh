@@ -238,43 +238,122 @@ show_module_info_standard() {
     target_path=$(get_module_target_path "$module")
 
     # Header
-    echo -e "\n${BOLD}${CYAN}${icon} ${name}${NC}"
-    echo -e "${DIM}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
-    # Basic information
-    echo -e "${BOLD}Module ID:${NC}     $module"
-    echo -e "${BOLD}Description:${NC}   $description"
-    echo -e "${BOLD}Version:${NC}       $version"
-    echo -e "${BOLD}Author:${NC}        $author"
-
+    echo -e "\n${BOLD}${CYAN}┌───────────────────────────────────────────────────────────────┐${NC}"
+    echo -e "${BOLD}${CYAN}│${NC} ${icon} ${BOLD}${name}${NC}${CYAN}$(printf '%*s' $((55 - ${#name} - ${#icon} - 1)) '│' )"
+    echo -e "${BOLD}${CYAN}└───────────────────────────────────────────────────────────────┘${NC}"
+    
+    # Description
+    echo -e "${DIM}${description}${NC}"
+    echo -e "${DIM}${version} • by ${author}${NC}"
+    
+    # Module ID
+    echo -e "\n${BOLD}Module:${NC} ${DIM}${module}${NC}"
+    
     # Paths
-    echo -e "\n${BOLD}Paths:${NC}"
-    echo -e "  ${BOLD}Source:${NC}  $CONFIG_SOURCE_DIR/$module"
-    echo -e "  ${BOLD}Target:${NC}  $target_path"
+    echo -e "\n${BOLD}${CYAN}●${NC} ${BOLD}Paths${NC}"
+    echo -e "  ${DIM}└─ ${NC}Source: ${CYAN}${CONFIG_SOURCE_DIR}/${module}${NC}"
+    echo -e "  ${DIM}  └─ ${NC}Target: ${CYAN}${target_path}${NC}"
 
     # Installation status
-    echo -e "\n${BOLD}Status:${NC}"
+    echo -e "\n${BOLD}${CYAN}●${NC} ${BOLD}Status${NC}"
     if is_module_installed "$module"; then
-        echo -e "  ${GREEN}✓ Installed${NC}"
+        echo -e "  ${DIM}└─ ${GREEN}✓ Installed${NC}"
 
-        # Show installation details
-        local file_count size modified
-        file_count=$(get_file_count "$target_path")
-        size=$(get_directory_size "$target_path")
-        modified=$(get_last_modified "$target_path")
-
-        echo -e "  ${BOLD}Files:${NC}        $file_count"
-        echo -e "  ${BOLD}Size:${NC}         $size"
-        echo -e "  ${BOLD}Modified:${NC}     $modified"
+        # Get module information
+        local install_type
+        install_type=$(get_module_installation_type "$module" 2>/dev/null || echo "unknown")
+        local source_path="$CONFIG_SOURCE_DIR/$module"
+        
+        # Calculate metrics
+        local source_file_count source_size
+        source_file_count=$(get_file_count "$source_path")
+        source_size=$(get_directory_size "$source_path")
+        
+        # Format helpers with consistent alignment
+        format_section() {
+            echo -e "\n${BOLD}${CYAN}●${NC} ${BOLD}${1}${NC}"
+        }
+        
+        # Format a key-value row with proper alignment
+        format_row() {
+            local label="${1}"
+            local value="${2}"
+            echo -e "  ${DIM}├─${NC} ${BOLD}${label}:${NC} ${value}"
+        }
+        
+        # Format a path with proper alignment and wrapping
+        format_path() {
+            local label="${1}:"
+            local path="${2}"
+            local prefix="  ${BOLD}${label}${NC}"
+            
+            # Calculate padding for alignment
+            printf -v padding '%*s' $((18 - ${#label})) ''
+            
+            # Print first line with label
+            echo -ne "${prefix}${padding}"
+            
+            # Print path with proper wrapping
+            local first_line=1
+            while IFS= read -r line; do
+                if [[ $first_line -eq 0 ]]; then
+                    # For subsequent lines, add proper indentation
+                    printf '  %-18s ' ''
+                fi
+                echo -e "${line}"
+                first_line=0
+            done <<< "$(echo "$path" | fold -s -w 70)"
+        }
+        
+        # Display installation information
+        echo -e "\n${BOLD}${CYAN}●${NC} ${BOLD}Installation${NC}"
+        echo -e "  ${DIM}└─${NC} ${BOLD}Type:${NC} ${GREEN}${install_type}${NC}"
+        
+        # Display source information
+        echo -e "\n${BOLD}${CYAN}●${NC} ${BOLD}Source${NC}"
+        echo -e "  ${DIM}├─${NC} ${BOLD}Path:${NC} ${CYAN}${source_path}${NC}"
+        echo -e "  ${DIM}├─${NC} ${BOLD}Files:${NC} ${source_file_count}"
+        echo -e "  ${DIM}└─${NC} ${BOLD}Size:${NC} ${source_size}"
+        
+        # Display target information based on installation type
+        case "$install_type" in
+            symlink)
+                local link_target
+                link_target=$(readlink -f "$target_path" 2>/dev/null || echo "(broken)")
+                echo -e "\n${BOLD}${CYAN}●${NC} ${BOLD}Symlink Target${NC}"
+                echo -e "  ${DIM}└─${NC} ${CYAN}${link_target}${NC}"
+                ;;
+            copy)
+                local target_file_count target_size
+                target_file_count=$(get_file_count "$target_path")
+                target_size=$(get_directory_size "$target_path")
+                echo -e "\n${BOLD}${CYAN}●${NC} ${BOLD}Installed Files${NC}"
+                echo -e "  ${DIM}├─${NC} ${BOLD}Location:${NC} ${CYAN}${target_path}${NC}"
+                echo -e "  ${DIM}├─${NC} ${BOLD}Files:${NC} ${target_file_count}"
+                echo -e "  ${DIM}└─${NC} ${BOLD}Size:${NC} ${target_size}"
+                ;;
+            *)
+                echo -e "\n${BOLD}${CYAN}●${NC} ${BOLD}Warning${NC}"
+                echo -e "  ${DIM}└─${NC} ${YELLOW}Installation type could not be determined${NC}"
+                ;;
+        esac
+        
+        # Show last modified date if target exists
+        if [[ -e "$target_path" || -L "$target_path" ]]; then
+            local modified
+            modified=$(get_last_modified "$target_path")
+            echo -e "\n${BOLD}${CYAN}●${NC} ${BOLD}Timestamps${NC}"
+            echo -e "  ${DIM}└─${NC} ${BOLD}Modified:${NC} ${modified}"
+        fi
 
         # Check for backups
         local backups
         readarray -t backups < <(find_backups "$target_path")
         if [[ ${#backups[@]} -gt 0 ]]; then
-            echo -e "  ${BOLD}Backups:${NC}      ${#backups[@]} found"
+            echo -e "  ${DIM}└─${NC} ${BOLD}Backups:${NC} ${#backups[@]} found"
         fi
     else
-        echo -e "  ${DIM}○ Not installed${NC}"
+        echo -e "  ${DIM}└─ ${YELLOW}○ Not installed${NC}"
     fi
 
     # Show files if requested or if show_all

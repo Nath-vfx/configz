@@ -28,6 +28,8 @@ OPTIONS:
     --install-hidden    Allow installation of hidden modules (DANGEROUS - requires confirmation)
     --no-deps           Skip dependency checks
     --dry-run           Show what would be installed without executing
+    --skip-installed    Skip already installed modules without asking
+    --reinstall         Reinstall all modules even if already installed
 
 ARGUMENTS:
     MODULE...           Specific modules to install (space-separated)
@@ -190,8 +192,9 @@ interactive_selection() {
 # Install single module
 install_single_module() {
     local module="$1"
-
+    
     log_info "Installing module: $module"
+    log_debug "Starting installation of module: $module"
 
     # Check if module exists
     if ! module_exists "$module"; then
@@ -199,13 +202,27 @@ install_single_module() {
         return 1
     fi
 
+    # Debug: Afficher les valeurs des variables globales
+    log_debug "FORCE=$FORCE, SKIP_INSTALLED=$SKIP_INSTALLED, REINSTALL=$REINSTALL"
+    
     # Check if already installed
     if is_module_installed "$module" && [[ $FORCE -eq 0 ]]; then
-        log_warning "Module '$module' is already installed"
-        if ! confirm "Reinstall module '$module'?"; then
-            log_info "Skipping module '$module'"
+        log_debug "Module '$module' is already installed and FORCE=$FORCE"
+        
+        if [[ $SKIP_INSTALLED -eq 1 ]]; then
+            log_info "Module '$module' is already installed, skipping (--skip-installed)"
             return 0
+        elif [[ $REINSTALL -eq 1 ]]; then
+            log_info "Module '$module' is already installed, reinstalling (--reinstall)"
+        else
+            log_warning "Module '$module' is already installed"
+            if ! confirm "Reinstall module '$module'?"; then
+                log_info "Skipping module '$module'"
+                return 0
+            fi
         fi
+    else
+        log_debug "Module '$module' is not installed or FORCE is enabled"
     fi
 
     # Check dependencies
@@ -233,11 +250,11 @@ install_single_module() {
             done
             echo
         fi
-        return 0
     else
         log_error "Failed to install module '$module'"
-        return 1
+        return 1  # On retourne 1 uniquement en cas d'erreur d'installation
     fi
+    return 0
 }
 
 # Install multiple modules
@@ -247,19 +264,47 @@ install_modules() {
     local failed=0
 
     log_info "Installing ${#modules[@]} modules..."
+    log_debug "Modules to install: ${modules[*]}"
+    log_debug "Number of modules: ${#modules[@]}"
+    log_debug "Module list: ${modules[*]}"
+    
+    # Debug: Afficher les variables globales
+    log_debug "[install_modules] Global variables:"
+    log_debug "  SKIP_INSTALLED=$SKIP_INSTALLED"
+    log_debug "  REINSTALL=$REINSTALL"
+    log_debug "  FORCE=$FORCE"
+    log_debug "  DRY_RUN=$DRY_RUN"
     echo
 
+    local module_count=0
+    log_debug "Starting module processing loop"
+    log_debug "Modules array content: ${modules[*]}"
+    log_debug "Modules array length: ${#modules[@]}"
+    
     for module in "${modules[@]}"; do
+        module_count=$((module_count + 1))
+        log_debug "Processing module $module_count/${#modules[@]}: $module"
+        log_debug "Module value: '$module'"
+        
+        if [[ -z "$module" ]]; then
+            log_warning "Empty module name encountered, skipping..."
+            continue
+        fi
+        
         if install_single_module "$module"; then
+            log_debug "Successfully processed module: $module"
             ((successful++))
         else
+            log_error "Failed to process module: $module"
             ((failed++))
         fi
         echo
     done
 
-    # Summary
+    # Résumé
+    echo
     echo -e "${BOLD}Installation Summary:${NC}"
+    log_debug "Processed $module_count modules in total"
     echo -e "  ${GREEN}Successful:${NC} $successful"
     if [[ $failed -gt 0 ]]; then
         echo -e "  ${RED}Failed:${NC} $failed"
@@ -274,6 +319,15 @@ install_modules() {
 
 # Install all modules
 install_all_modules() {
+    # Vérification de la variable d'environnement
+    if [[ -z "$CONFIG_SOURCE_DIR" ]]; then
+        log_error "CONFIG_SOURCE_DIR n'est pas définie !"
+        return 1
+    fi
+    if [[ ! -d "$CONFIG_SOURCE_DIR" ]]; then
+        log_error "Le dossier source des modules n'existe pas : $CONFIG_SOURCE_DIR"
+        return 1
+    fi
     local modules
     
     # Get modules based on ALLOW_HIDDEN flag
@@ -284,7 +338,8 @@ install_all_modules() {
         readarray -t modules < <(get_available_modules "false")
         log_info "Excluding hidden modules for security (use --install-hidden to include)"
     fi
-
+    # Debug : afficher la liste des modules trouvés
+    echo "[DEBUG] Modules trouvés : ${modules[*]}"
     if [[ ${#modules[@]} -eq 0 ]]; then
         if [[ ${ALLOW_HIDDEN:-0} -eq 1 ]]; then
             log_error "No modules found to install (including hidden)"
@@ -335,7 +390,13 @@ install_all_modules() {
         return 1
     fi
 
-    install_modules "${modules[@]}"
+    # Appel à install_modules avec tous les modules
+    log_debug "Calling install_modules with ${#modules[@]} modules: ${modules[*]}"
+    if ! install_modules "${modules[@]}"; then
+        log_error "Failed to install some modules"
+        return 1
+    fi
+    return 0
 }
 
 # Preview installation
@@ -461,91 +522,129 @@ install_main() {
     local interactive=0
     local skip_deps=0
     local allow_hidden=0
+    local skip_installed=0
+    local reinstall=0
 
-    # Parse command-specific options
-    while [[ $# -gt 0 ]]; do
-        case $1 in
+    # First pass: collect all arguments
+    local args=("$@")
+    local processed_args=()
+    
+    # Process all arguments to collect options and modules
+    log_debug "Processing arguments: ${args[*]}"
+    while [[ ${#args[@]} -gt 0 ]]; do
+        log_debug "Current argument: ${args[0]}"
+        case ${args[0]} in
             -h|--help)
                 show_install_help
                 exit 0
                 ;;
             -a|--all)
                 install_all=1
-                shift
                 ;;
             -i|--interactive)
                 interactive=1
-                shift
                 ;;
             -f|--force)
                 FORCE=1
-                shift
                 ;;
             --no-backup)
                 NO_BACKUP=1
-                shift
                 ;;
             --no-symlink)
                 NO_SYMLINK=1
-                shift
                 ;;
             --install-hidden)
                 allow_hidden=1
-                shift
+                ;;
+            --skip-installed)
+                skip_installed=1
+                ;;
+            --reinstall)
+                reinstall=1
                 ;;
             --no-deps)
                 skip_deps=1
-                shift
                 ;;
             --dry-run)
                 DRY_RUN=1
-                shift
                 ;;
             -*)
-                log_error "Unknown option: $1"
+                log_error "Unknown option: ${args[0]}"
                 log_info "Use '$PROGRAM_NAME install --help' for available options"
                 exit 1
                 ;;
             *)
-                modules+=("$1")
-                shift
+                # This is a module name, add it to the modules array
+                log_debug "Adding module: ${args[0]}"
+                modules+=("${args[0]}")
                 ;;
         esac
+        # Shift the current argument out of the array
+        log_debug "Shifting args: ${args[*]}"
+        args=("${args[@]:1}")
+        log_debug "Args after shift: ${args[*]}"
     done
 
     # Export variables for use in functions
-    SKIP_DEPS=$skip_deps
-    ALLOW_HIDDEN=$allow_hidden
+    export SKIP_DEPS=$skip_deps
+    export ALLOW_HIDDEN=$allow_hidden
+    export SKIP_INSTALLED=$skip_installed
+    export REINSTALL=$reinstall
+    
+    # Debug: Afficher les valeurs des variables
+    log_debug "Variables after processing arguments:"
+    log_debug "  SKIP_DEPS=$SKIP_DEPS"
+    log_debug "  ALLOW_HIDDEN=$ALLOW_HIDDEN"
+    log_debug "  SKIP_INSTALLED=$SKIP_INSTALLED"
+    log_debug "  REINSTALL=$REINSTALL"
+    log_debug "  FORCE=$FORCE"
+    log_debug "  modules=(${modules[*]})"
+    
+    # Log flags if set
+    if [[ $skip_installed -eq 1 ]]; then
+        log_info "--skip-installed: Will skip already installed modules"
+    fi
+    if [[ $reinstall -eq 1 ]]; then
+        log_info "--reinstall: Will reinstall all specified modules"
+    fi
+    if [[ $skip_installed -eq 1 && $reinstall -eq 1 ]]; then
+        log_error "Cannot use --skip-installed and --reinstall together"
+        exit 1
+    fi
 
     # Ensure yq for advanced features
     ensure_yq >/dev/null 2>&1
 
+    # Debug: Afficher les modules avant la validation
+    log_debug "[install_main] Modules before validation: ${modules[*]}"
+    log_debug "[install_main] Number of modules: ${#modules[@]}"
+    
     # Determine installation mode
     if [[ $install_all -eq 1 ]]; then
-        if [[ $DRY_RUN -eq 1 ]]; then
-            local all_modules
-            if [[ $allow_hidden -eq 1 ]]; then
-                readarray -t all_modules < <(get_available_modules "true")
-            else
-                readarray -t all_modules < <(get_available_modules "false")
-            fi
-            preview_installation "${all_modules[@]}"
-        else
-            install_all_modules
-        fi
+        install_all_modules
     elif [[ ${#modules[@]} -gt 0 ]]; then
         # Validate modules exist
         local invalid_modules=()
         local hidden_modules=()
         
+        log_debug "[install_main] Validating modules..."
         for module in "${modules[@]}"; do
+            log_debug "[install_main] Validating module: $module"
             if ! module_exists "$module"; then
+                log_debug "[install_main] Module not found: $module"
                 invalid_modules+=("$module")
             elif [[ "$module" =~ ^\..*$ ]]; then
+                log_debug "[install_main] Hidden module found: $module"
                 hidden_modules+=("$module")
+            else
+                log_debug "[install_main] Module is valid: $module"
             fi
         done
 
+        # Afficher les modules après validation
+        log_debug "[install_main] After validation - Modules to install: ${modules[*]}"
+        log_debug "[install_main] After validation - Number of modules: ${#modules[@]}"
+        
         if [[ ${#invalid_modules[@]} -gt 0 ]]; then
             log_error "Invalid modules: ${invalid_modules[*]}"
             log_info "Available modules:"
@@ -578,10 +677,19 @@ install_main() {
             fi
         fi
 
+        # Créer un nouveau tableau pour s'assurer que les modules sont correctement passés
+        local install_modules_array=("${modules[@]}")
+        log_debug "[install_main] Calling install_modules with: ${#install_modules_array[@]} modules"
+        log_debug "[install_main] Modules to install: ${install_modules_array[*]}"
+        
         if [[ $DRY_RUN -eq 1 ]]; then
-            preview_installation "${modules[@]}"
+            preview_installation "${install_modules_array[@]}"
         else
-            install_modules "${modules[@]}"
+            # Appeler install_modules avec le tableau d'arguments
+            if ! install_modules "${install_modules_array[@]}"; then
+                log_error "Failed to install one or more modules"
+                return 1
+            fi
         fi
     elif [[ $interactive -eq 1 ]]; then
         interactive_selection

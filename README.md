@@ -1,8 +1,10 @@
 # Configz - Modern Configuration Management CLI
 
-**Version : 0.3.0-alpha**
+**Version : 0.4.0-alpha**
 
 A modern, modular configuration management system for your dotfiles and application configurations.
+
+> **Note:** This is an alpha version. The CLI interface and features are still evolving.
 
 ## 🚀 Quick Start
 
@@ -17,33 +19,36 @@ cd configz
 ./install-cli.sh
 
 # Start using it
-configz --version   # -> must show 0.3.0-alpha
+configz --version   # -> must show 0.4.0-alpha
 configz list
 ```
 
 ### First Time Setup
 
 ```bash
-# Create your modules directory (first time only)
-mkdir -p ~/.config/configz/modules
-
-# List available modules (will be empty initially)
-configz list
-
-# Create your first module
+# Initialize the configz directory structure (first time only)
 configz init my-app
+
+# List available modules (will show your new module)
+configz list
 ```
+
+## 🚨 Breaking Changes in v0.4.0
+
+- Simplified `init` command with a more focused feature set
+- Removed some advanced options from `init` that will be reimplemented in future versions
+- Improved error handling and validation
+- More consistent command output formatting
 
 ## ✨ Features
 
 - 🎯 **Modern CLI** with intuitive commands and colorful output
 - 📦 **Auto-discovery** - Automatically detects modules in your modules directory
-- ⚙️ **Flexible configuration** - Works with or without `configz.toml` files
-- 🔒 **Automatic backups** with timestamped backups of existing configurations
-- 🎨 **Rich output** with icons, colors, and detailed information
+- ⚙️ **Simple configuration** - Basic `configz.toml` file generation
+- 🔒 **Safe operations** - No destructive actions without confirmation
+- 🎨 **Rich output** with colors and clear feedback
 - 🔧 **Extensible** - Add a directory = new module available
-- ⚡ **Batch operations** with progress indicators
-- 🛠️ **Customizable paths** - Use any directory for your modules
+- ⚡ **Fast and lightweight** - Minimal dependencies, fast execution
 
 ## 📁 Default Structure
 
@@ -65,37 +70,79 @@ configz init my-app
 
 ## 🎮 Basic Usage
 
+### Initialize a New Module
+```bash
+# Create a new module with default configuration
+configz init my-module
+
+# The module will be created in: ~/.config/configz/modules/my-module
+# A basic configz.toml file will be generated automatically
+```
+
 ### List Modules
 ```bash
-configz list                   # List all modules
+configz list                   # List all available modules
 configz list --installed       # Show only installed modules
-configz list --json           # JSON output for scripting
 ```
 
 ### Install Modules
 ```bash
-configz install fish          # Install single module
-configz install fish nvim      # Install multiple modules
-configz install --all          # Install all modules
-configz install --dry-run fish # Preview what would be installed
+configz install my-module      # Install a single module
+configz install --all          # Install all available modules
 ```
 
-### Module Information
+### Get Module Information
 ```bash
-configz info fish              # Show detailed module info
-configz status                 # Show installation status of all modules
-```
-
-### Custom Directories
-```bash
-# Use custom modules directory
-configz --modules-dir ~/my-configs list
-
-# Use custom target directory
-configz --config-dir ~/custom-config install fish
+configz info my-module        # Show module details
+configz status                # Show installation status
 ```
 
 ## 📖 Creating Modules
+
+### Module Structure
+
+When you create a new module with `configz init <name>`, the following structure is created:
+
+```
+~/.config/configz/modules/
+└── <module-name>/
+    └── configz.toml     # Module configuration
+    └── ...               # Your configuration files
+```
+
+### The configz.toml File
+
+A basic `configz.toml` is automatically created with these default values:
+
+```toml
+[module]
+name = "module-name"
+description = "Configuration for module-name"
+icon = "📦"
+version = "0.1.0"
+author = "your-username"
+
+[installation]
+type = "symlink"  # or "copy"
+
+[paths]
+target = "module-name"
+sources = [
+    # List of files/directories to include
+    # "config.conf",
+    # "themes/",
+]
+
+[dependencies]
+# system = ["required_command1", "required_command2"]
+# modules = ["other_module1", "other_module2"]
+
+[post_install]
+notes = [
+    # Add any post-installation notes here
+    # "Restart your terminal after installation",
+]
+```
 
 ### Simple Module (Auto-detected)
 ```bash

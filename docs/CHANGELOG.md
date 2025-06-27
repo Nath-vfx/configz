@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0-alpha] - 2025-06-27
+
+### ✨ Major Changes
+
+#### Simplified Init Command
+- **Streamlined workflow**: The `init` command has been completely refactored for simplicity and reliability
+- **Removed complexity**: Advanced options have been temporarily removed to ensure a stable core
+- **Improved validation**: Better module name validation and error messages
+- **Cleaner codebase**: Major code cleanup and restructuring
+
+### 🔧 Enhanced
+- **Documentation**: Complete overhaul of README and documentation
+- **Error handling**: More robust error handling and user feedback
+- **Code quality**: Improved code organization and maintainability
+
+### 🚀 New Features
+- **Basic module creation**: Simple and reliable module initialization
+- **Config file generation**: Automatic creation of `configz.toml` with sensible defaults
+- **Module structure**: Standardized module directory structure
+
+### 🔒 Security
+- **Safer operations**: No destructive actions without confirmation
+- **Input validation**: Strict validation of all user inputs
+
+### 📦 Dependencies
+- **Minimal dependencies**: Reduced external dependencies for better reliability
+
+### 🐛 Bug Fixes
+- Fixed various edge cases in module initialization
+- Resolved issues with path handling
+- Improved error messages for better debugging
+
+### 📝 Documentation
+- Updated all documentation to reflect current features
+- Added clear examples for all commands
+- Improved help messages and user guidance
+
+
 ## [0.3.0-alpha] - 2025-01-21
 
 ### ✨ Major Features Added

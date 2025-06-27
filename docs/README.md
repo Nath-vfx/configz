@@ -1,6 +1,10 @@
 # Configz Documentation
 
+**Version : 0.4.0-alpha**
+
 Welcome to the Configz documentation! This guide will help you get started with the modern configuration management CLI.
+
+> **Note:** This is an alpha version. The CLI interface and features are still evolving.
 
 ## 📚 Documentation Structure
 
@@ -19,19 +23,44 @@ Welcome to the Configz documentation! This guide will help you get started with 
 
 ## 🚀 Quick Start
 
+### Installation
+
 ```bash
-# Install the CLI
+# Clone the repository
+git clone https://github.com/Nath-vfx/configz.git
+cd configz
+
+# Install the CLI globally
 ./install-cli.sh
 
-# Create your modules directory
-mkdir -p ~/.config/configz/modules
+# Start using it
+configz --version   # -> must show 0.4.0-alpha
+```
+
+### First Steps
+
+```bash
+# Initialize a new module
+configz init my-module
 
 # List available modules
 configz list
 
-# Create your first module
-configz init my-app
+# Install a module
+configz install my-module
+
+# Check module status
+configz status
 ```
+
+## 🚧 Upcoming Features
+
+The following features are planned for future versions:
+
+- `configz restore` - Restore configurations from backup
+- `configz search` - Search for available modules
+- `configz update` - Update installed modules
+- `configz doctor` - Check system health and dependencies
 
 ## 📖 What is Configz?
 
@@ -46,20 +75,21 @@ Configz is a modern, modular configuration management system that helps you:
 ## 🎯 Key Features
 
 - 🎯 **Modern CLI** with intuitive commands and colorful output
-- 📦 **Auto-discovery** of configuration modules
-- 🔒 **Automatic backups** with timestamped snapshots
-- 🛠️ **Customizable paths** for modules and target directories
-- ⚡ **Batch operations** with progress indicators
-- 🎨 **Rich output** with icons, colors, and detailed information
+- 📦 **Auto-discovery** - Automatically detects modules in your modules directory
+- ⚙️ **Simple configuration** - Basic `configz.toml` file generation
+- 🔒 **Safe operations** - No destructive actions without confirmation
+- 🎨 **Rich output** with colors and clear feedback
+- 🔧 **Extensible** - Add a directory = new module available
+- ⚡ **Fast and lightweight** - Minimal dependencies, fast execution
 
-## 🏗️ Architecture
+## 🏗️ Project Structure
 
 ```
 ~/.config/configz/
 ├── modules/                   # Your configuration modules
-│   ├── fish/                  # Fish shell configuration
-│   ├── nvim/                  # Neovim configuration
-│   └── starship/              # Starship prompt
+│   ├── module-name/           # Example module
+│   │   ├── configz.toml      # Module configuration
+│   │   └── ...               # Your configuration files
 ├── backups/                   # Automatic backups
 └── config.toml               # Global settings
 ```
@@ -73,12 +103,24 @@ Configz is a modern, modular configuration management system that helps you:
 | `~/.config/configz/config.toml` | Global configuration |
 | `~/.config/` | Default target for installations |
 
+## 🛠️ Available Commands
+
+| Command | Description |
+|---------|-------------|
+| `init <name>` | Create a new module |
+| `list` | List available modules |
+| `install <module>` | Install a module |
+| `info <module>` | Show module details |
+| `status` | Show installation status |
+| `--help` | Show help message |
+| `--version` | Show version information |
+
 ## 🆘 Getting Help
 
 - **Command help**: `configz --help` or `configz <command> --help`
-- **System check**: `configz doctor`
-- **Verbose output**: Add `--verbose` to any command
-- **Issues**: Report bugs on GitHub
+- **Verbose output**: Add `-v` or `--verbose` to any command
+- **Debug mode**: Set `CONFIGZ_DEBUG=1` for detailed debug output
+- **Issues**: Report bugs on [GitHub Issues](https://github.com/Nath-vfx/configz/issues)
 
 ## 🔗 External Resources
 
