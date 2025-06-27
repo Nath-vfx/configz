@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Configz - Modern Configuration Management CLI
-# Version: 0.3.0-alpha
+# Version: 0.4.0-alpha
 # Author: Your Name
 
 set -euo pipefail
@@ -17,7 +17,7 @@ CONFIG_SOURCE_DIR="$HOME/.config/configz/modules"
 TARGET_BASE_DIR="$HOME/.config"
 
 # Version and metadata
-VERSION="0.3.0-alpha"
+VERSION="0.4.0-alpha"
 PROGRAM_NAME="configz"
 
 # Default options

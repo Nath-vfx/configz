@@ -19,7 +19,7 @@ cd configz
 ./install-cli.sh
 
 # Start using it
-configz --version   # -> must show 0.3.0-alpha
+configz --version   # -> must show 0.4.0-alpha
 configz list
 ```
 

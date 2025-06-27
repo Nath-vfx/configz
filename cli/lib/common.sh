@@ -799,7 +799,7 @@ EOF
     if [[ ! -f "$registry_file" ]]; then
         cat > "$registry_file" << 'EOF'
 {
-  "version": "0.3.0-alpha",
+  "version": "0.4.0-alpha",
   "installed_modules": {},
   "last_updated": "",
   "migration_completed": false
