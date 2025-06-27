@@ -133,8 +133,8 @@ For more information about a specific command, use:
     $PROGRAM_NAME <COMMAND> --help
 
 NOTE:
-    This CLI interface is in alpha. The original interactive installer
-    (./install.sh) remains stable and fully supported.
+    This CLI interface is in alpha. Some behavior may be unstable.
+    Use it at your own risk.
 
 CONFIGURATION:
     Modules directory: $CONFIG_SOURCE_DIR
